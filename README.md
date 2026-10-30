@@ -130,6 +130,8 @@ Windows 下使用 `gradlew.bat` 执行相同任务。没有本地签名配置时
 
 发布与签名说明见 [PUBLISHING.md](docs/PUBLISHING.md)。
 
+正式发布可推送 `版本码-版本号` 标签（如 `20111-2.1.11`），触发 [Publish signed APK](https://github.com/wannenqingnian/GeoLocation/actions/workflows/release.yml)：自动测试、构建、签名并上传 APK 与校验文件到 Releases。首次使用前需要配置签名 Secrets。
+
 ## 支持项目
 
 如果项目对你有帮助，欢迎通过 [PayPal](https://www.paypal.me/KnoxLeo) 自愿支持后续维护。捐赠不会解锁功能，也不影响正常使用。

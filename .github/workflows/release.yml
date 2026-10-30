@@ -1,34 +1,42 @@
-name: Build and attach release APK
+name: Publish signed APK
 
 on:
+  push:
+    tags: ['[0-9]*-*.*.*']
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing GitHub Release tag, for example 10000-1.0.0"
+        description: "Existing version tag, for example 20110-2.1.10"
         required: true
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_tag || github.ref }}
           persist-credentials: false
 
       - name: Validate release tag
         id: version
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         shell: bash
         run: |
           tag="$RELEASE_TAG"
@@ -47,6 +55,7 @@ jobs:
             exit 1
           fi
           echo "version=$major.$minor.$patch$suffix" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -55,10 +64,22 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Install required Android SDK packages
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+
       - name: Test, lint and build unsigned release APK
         env:
           APP_VERSION_NAME: ${{ steps.version.outputs.version }}
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease :regression:assembleDebug :regression:assembleDebugAndroidTest
+        run: >-
+          ./gradlew --no-daemon
+          '-Dorg.gradle.jvmargs=-Xmx4g -XX:+UseG1GC -XX:ReservedCodeCacheSize=256m -Dfile.encoding=UTF-8'
+          --max-workers=2
+          :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintRelease
+          :app:assembleRelease :app:assembleDebugAndroidTest
+          :regression:assembleDebug :regression:assembleDebugAndroidTest
 
       - name: Stage unsigned APK
         env:
@@ -85,16 +106,23 @@ jobs:
   sign-and-upload:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
+      - name: Install Android signing tools
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: 'build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+
       - name: Download verified build artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: unsigned-release
           path: staging
 
-      - name: Restore signing key
+      - name: Sign verified APK
         env:
           KEYSTORE_BASE64: ${{ secrets.GEOLOCATION_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.GEOLOCATION_KEYSTORE_PASSWORD }}
@@ -108,20 +136,22 @@ jobs:
               exit 1
             fi
           done
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > geolocation-release.jks
+          umask 077
+          keystore="$RUNNER_TEMP/geolocation-release.p12"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
-            --ks geolocation-release.jks \
-            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --ks "$keystore" \
+            --ks-pass env:KEYSTORE_PASSWORD \
             --ks-key-alias "$KEY_ALIAS" \
-            --key-pass "pass:$KEY_PASSWORD" \
+            --key-pass env:KEY_PASSWORD \
             --out "GeoLocation-${{ needs.build.outputs.version }}.apk" \
             staging/unsigned.apk
-          rm -f geolocation-release.jks
 
       - name: Verify release signature and build type
         env:
           APK_PATH: GeoLocation-${{ needs.build.outputs.version }}.apk
-          EXPECTED_CERT: 26ffd7b501c54b76a7a39495105cf0f8e596a56f9fca88ec2111f230e19fb5f7
+          EXPECTED_CERT: cc5e95bcabbf19ad79992ffffbae77bf2dad5cafed01b4f3cd2c2e7213ec7633
         shell: bash
         run: |
           verification=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK_PATH")
@@ -131,17 +161,26 @@ jobs:
           if grep -q 'application-debuggable' <<< "$badging"; then
             echo '::error::Debuggable APK cannot be released'; exit 1
           fi
-          sha256sum "$APK_PATH"
+          sha256sum "$APK_PATH" | tee "$APK_PATH.sha256"
 
-      - name: Upload APK to draft release
+      - name: Publish signed release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          IS_PRERELEASE: ${{ contains(needs.build.outputs.version, '-') }}
           APK_PATH: GeoLocation-${{ needs.build.outputs.version }}.apk
         shell: bash
         run: |
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true || {
-            echo '::error::Only a draft release may receive a new build'; exit 1;
-          }
-          gh release upload "$RELEASE_TAG" "$APK_PATH"
+          if state=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$state" = true || {
+              echo '::error::Published releases cannot be overwritten'; exit 1;
+            }
+            gh release upload "$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" \
+              --verify-tag --draft --title "GeoLocation $VERSION" --generate-notes \
+              --prerelease="$IS_PRERELEASE"
+          fi
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease="$IS_PRERELEASE"

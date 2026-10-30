@@ -1,6 +1,6 @@
 # 公开发布说明
 
-本文用于将 GeoLocation 发布到 GitHub，并提交至 LSPosed 模块仓库。源码仓库为 <https://github.com/ceigt/GeoLocation>，包名为 `io.github.ceigt.geolocation`。
+本文用于将 GeoLocation 发布到 GitHub，并提交至 LSPosed 模块仓库。源码仓库为 <https://github.com/wannenqingnian/GeoLocation>，包名为 `io.github.ceigt.geolocation`。
 
 ## 发布前安全检查
 
@@ -26,7 +26,7 @@ git diff --cached --check
 在项目根目录执行。以下命令只暂存、提交并推送当前项目；请先自行核对 `git status` 输出。
 
 ```powershell
-git remote set-url origin https://github.com/ceigt/GeoLocation.git
+git remote set-url origin https://github.com/wannenqingnian/GeoLocation.git
 git branch -M main
 git add .
 git status
@@ -73,28 +73,33 @@ APK 必须使用你自己的正式签名。没有 `keystore.properties` 的本�
 
 日常测试版使用 “Verify changes”：推送到 `main` 或 `fixes/**` 分支即执行测试、Lint 和 APK 构建，也可手动选择分支运行。成功后的 `candidate-apks-<提交哈希>` 附件保留 14 天，包含未签名 Release APK 和设备测试客户端；验证报告单独保存。下载 Release APK 后使用现有正式证书在本机签名并校验证书指纹即可安装，签名不需要重新编译。这个流程不上传本机私钥或地图凭据，也不会创建公开 Release。
 
-`.github/workflows/release.yml` 仅可手动触发，并向**已经创建的** GitHub Release 上传 APK。先在仓库 Settings → Secrets and variables → Actions 添加：
+正式发布使用 [Publish signed APK](https://github.com/wannenqingnian/GeoLocation/actions/workflows/release.yml)。与日常校验不同，这个流程会自动签名并将 APK 上传到公开 Releases。它只在推送版本标签时触发，也可手动输入已有标签重试；推送普通代码不会自动公开发布。
 
-2.0 使用本机独立正式签名；本轮没有把私钥自动上传到 Actions。以下前四项为 CI 签名必需项，地图凭据均可留空，由安装者在设置中输入。缺少本地签名配置时，Release 构建保持未签名，不再使用 Debug 证书替代。
+先在仓库 Settings → Secrets and variables → Actions 配置四个签名 Secrets（不要提交到源码）：
 
 ```text
 GEOLOCATION_KEYSTORE_BASE64
 GEOLOCATION_KEYSTORE_PASSWORD
 GEOLOCATION_KEY_ALIAS
 GEOLOCATION_KEY_PASSWORD
-GEOLOCATION_BAIDU_WEB_AK
-GEOLOCATION_AMAP_WEB_KEY
-GEOLOCATION_AMAP_SECURITY_CODE
-GEOLOCATION_GOOGLE_MAPS_API_KEY
 ```
 
-`GEOLOCATION_KEYSTORE_BASE64` 是 JKS 文件的 Base64 内容。PowerShell 示例：
+`GEOLOCATION_KEYSTORE_BASE64` 是本机 `keystore/geolocation-release.p12` 的 Base64 内容，其他三项对应 `keystore.properties` 的密码和别名。地图凭据无需配置，由安装者在设置中输入。请保留同一份证书，工作流会校验本仓库的正式证书 SHA-256：
+
+```text
+cc5e95bcabbf19ad79992ffffbae77bf2dad5cafed01b4f3cd2c2e7213ec7633
+```
+
+发布时先提交代码，再推送对应的版本标签，例如：
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\geolocation-release.jks")) | Set-Clipboard
+git tag 20111-2.1.11
+git push origin 20111-2.1.11
 ```
 
-创建 GitHub Release 草稿后，在 Actions 中运行 “Build and attach release APK”，输入同一标签，例如 `10000-1.0.0`。工作流会校验标签与版本号映射，执行单元测试、Release Lint、构建及正式签名指纹校验，然后上传到草稿。已经公开的 Release 和同名附件不会被覆盖。完成实机验证后再发布草稿。签名和地图配置只写入临时构建环境，不会写回仓库。
+无需预先创建 Release 草稿。流水线会校验标签与版本号映射，运行 Debug/Release 单元测试、Release Lint、构建及设备测试代码编译，再将验证过的产物交给独立签名任务。签名和构建类型校验通过后，自动创建草稿、上传签名 APK 与 SHA-256 校验文件，最后公开发布。带版本后缀的标签（如 `20111-2.1.11-rc.1`）会标记为预发布。
+
+已公开的 Release 不会被覆盖；失败后可在 Actions 手动选择同一标签重试，已有草稿中的同名附件会更新。证书只在签名任务中临时恢复，步骤结束即删除。实机测试仍须在正式发布标签前由维护者完成。
 
 ## 提交 LSPosed 模块仓库
 

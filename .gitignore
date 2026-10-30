@@ -39,6 +39,7 @@ ehthumbs.db
 captures/
 /work/
 *.hprof
+__pycache__/
 
 # === Google services (API keys etc) ===
 google-services.json
