@@ -17,6 +17,7 @@ xposed-api = "101.0.0"
 xposed-service = "101.0.0"
 
 [libraries]
+osmdroid = { module = "org.osmdroid:osmdroid-android", version = "6.1.20" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

@@ -253,7 +253,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val baiduMapAk: StateFlow<String> = _baiduMapAkPreference.state
 
     val mapProvider: StateFlow<MapProvider> = preferencesRepository.getMapProviderFlow()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, MapProvider.BAIDU)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, MapProvider.OSMDROID)
 
     private val _amapWebKeyPreference = Preference(
         DEFAULT_AMAP_WEB_KEY,

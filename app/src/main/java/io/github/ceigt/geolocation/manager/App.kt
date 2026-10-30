@@ -3,6 +3,9 @@ package io.github.ceigt.geolocation.manager
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
+import io.github.ceigt.geolocation.BuildConfig
+import org.osmdroid.config.Configuration
+import java.io.File
 import io.github.ceigt.geolocation.data.JsonCodec
 import io.github.ceigt.geolocation.data.DEFAULT_ENABLE_MOCK_PROVIDER
 import io.github.ceigt.geolocation.data.KEY_ENABLE_MOCK_PROVIDER
@@ -47,6 +50,11 @@ class App : Application(), XposedServiceHelper.OnServiceListener {
 
     override fun onCreate() {
         super.onCreate()
+        Configuration.getInstance().apply {
+            userAgentValue = "$packageName/${BuildConfig.VERSION_NAME}"
+            osmdroidBasePath = File(cacheDir, "osmdroid")
+            osmdroidTileCache = File(osmdroidBasePath, "tiles").apply { mkdirs() }
+        }
         XposedServiceHelper.registerListener(this)   // exactly once
         applicationScope.launch {
             CredentialStore.migratePlaintext(getSharedPreferences(SHARED_PREFS_FILE, MODE_PRIVATE))

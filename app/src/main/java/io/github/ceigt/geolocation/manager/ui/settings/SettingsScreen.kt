@@ -432,9 +432,10 @@ fun SettingsScreen(
                         },
                         onClearMapCache = {
                             cacheScope.launch {
-                                WebMapCache.clear(context)
+                                val cleared = WebMapCache.clear(context)
                                 snackbarHostState.showSnackbar(
-                                    context.getString(R.string.setting_map_cache_cleared)
+                                    context.getString(if (cleared) R.string.setting_map_cache_cleared
+                                        else R.string.setting_map_cache_failed)
                                 )
                             }
                         }
@@ -669,8 +670,10 @@ fun SettingsBottomSheet(
                         },
                         onClearMapCache = {
                             cacheScope.launch {
-                                WebMapCache.clear(context)
-                                snackbarHostState.showSnackbar(context.getString(R.string.setting_map_cache_cleared))
+                                val cleared = WebMapCache.clear(context)
+                                snackbarHostState.showSnackbar(context.getString(
+                                    if (cleared) R.string.setting_map_cache_cleared
+                                    else R.string.setting_map_cache_failed))
                             }
                         }
                     )
@@ -762,6 +765,11 @@ private fun MapServiceSettings(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
         when (provider) {
+            MapProvider.OSMDROID -> Text(
+                stringResource(R.string.map_osmdroid_description),
+                modifier = Modifier.padding(Dimensions.SPACING_MEDIUM),
+                style = MaterialTheme.typography.bodySmall
+            )
             MapProvider.BAIDU -> BaiduMapAkSetting(baiduMapAk, onSaveBaidu, onSaved)
             MapProvider.AMAP -> AmapCredentialSetting(
                 amapWebKey,
@@ -819,6 +827,7 @@ private fun MapProviderSelector(
                     Text(
                         text = stringResource(
                             when (option) {
+                                MapProvider.OSMDROID -> R.string.map_provider_osmdroid
                                 MapProvider.BAIDU -> R.string.map_provider_baidu
                                 MapProvider.AMAP -> R.string.map_provider_amap
                                 MapProvider.GOOGLE -> R.string.map_provider_google

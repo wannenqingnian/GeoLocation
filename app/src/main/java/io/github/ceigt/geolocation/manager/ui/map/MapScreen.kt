@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.github.ceigt.geolocation.R
+import io.github.ceigt.geolocation.data.MapProvider
 import io.github.ceigt.geolocation.data.model.FavoriteLocation
 import io.github.ceigt.geolocation.manager.App
 import io.github.ceigt.geolocation.manager.ui.map.components.MapViewContainer
@@ -331,6 +332,19 @@ fun MapScreen(
                         .align(Alignment.BottomEnd)
                         .padding(end = 42.dp, bottom = 47.dp)
                 )
+                }
+                if (mapProvider == MapProvider.OSMDROID) {
+                    Text(
+                        "© OpenStreetMap contributors",
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(bottom = 6.dp)
+                            .clickable {
+                                context.startActivity(Intent(Intent.ACTION_VIEW,
+                                    Uri.parse("https://www.openstreetmap.org/copyright")))
+                            },
+                        fontSize = 11.sp,
+                        color = Color(0xFF334155)
+                    )
                 }
                 SnackbarHost(
                     hostState = snackbarHostState,

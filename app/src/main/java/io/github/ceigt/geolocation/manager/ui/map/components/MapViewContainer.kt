@@ -82,7 +82,7 @@ fun MapViewContainer(
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
     }
 
-    DisposableEffect(lifecycleOwner, mapViewModel) {
+    DisposableEffect(lifecycleOwner, mapViewModel, mapProvider) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
@@ -106,7 +106,9 @@ fun MapViewContainer(
     }
 
     if (isMapForeground) {
-        ActiveWebMapContainer(
+        if (mapProvider == MapProvider.OSMDROID) {
+            OsmMapContainer(mapViewModel, onMapInteraction)
+        } else ActiveWebMapContainer(
             mapViewModel,
             WebMapConfig(mapProvider, baiduMapAk, amapWebKey, amapSecurityCode, googleMapsApiKey),
             onMapInteraction
@@ -606,7 +608,7 @@ private fun parseReverseGeocodeResult(payload: String): ReverseGeocodeDisplay = 
     )
 }.getOrDefault(ReverseGeocodeDisplay(null, null))
 
-private fun getLastKnownDeviceLocation(context: Context): DeviceLocation? {
+internal fun getLastKnownDeviceLocation(context: Context): DeviceLocation? {
     val granted = ContextCompat.checkSelfPermission(
         context,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -650,7 +652,7 @@ private fun LoadingSpinner() {
     }
 }
 
-private data class DeviceLocation(
+internal data class DeviceLocation(
     val point: GeoPoint,
     val accuracy: Float
 )
@@ -677,6 +679,7 @@ private data class WebMapConfig(
 
 private val MapProvider.assetPath: String
     get() = when (this) {
+        MapProvider.OSMDROID -> error("osmdroid uses a native MapView")
         MapProvider.BAIDU -> "map/baidu_map.html"
         MapProvider.AMAP -> "map/amap_map.html"
         MapProvider.GOOGLE -> "map/google_map.html"
@@ -685,13 +688,13 @@ private val MapProvider.assetPath: String
 private fun MapProvider.fromWgs84(point: GeoPoint): GeoPoint = when (this) {
     MapProvider.BAIDU -> CoordinateTransform.wgs84ToBd09(point)
     MapProvider.AMAP -> CoordinateTransform.wgs84ToGcj02(point.latitude, point.longitude)
-    MapProvider.GOOGLE -> point
+    MapProvider.GOOGLE, MapProvider.OSMDROID -> point
 }
 
 private fun MapProvider.toWgs84(point: GeoPoint): GeoPoint = when (this) {
     MapProvider.BAIDU -> CoordinateTransform.bd09ToWgs84(point)
     MapProvider.AMAP -> CoordinateTransform.gcj02ToWgs84(point)
-    MapProvider.GOOGLE -> point
+    MapProvider.GOOGLE, MapProvider.OSMDROID -> point
 }
 
 private const val APP_ORIGIN = "https://appassets.androidplatform.net/"

@@ -12,7 +12,7 @@ plugins {
 
 // Version is derived from the release tag in CI (passed via -PappVersionName=vX.Y.Z or the
 // APP_VERSION_NAME env var). Local builds fall back to the dev version below.
-val fallbackVersionName = "2.1.8"
+val fallbackVersionName = "2.1.9"
 
 fun resolveVersionName(): String {
     val provided = (project.findProperty("appVersionName") as String?)
@@ -143,6 +143,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.hiddenapibypass)
+    implementation(libs.osmdroid)
 
     testImplementation(libs.junit)
     testImplementation(libs.libxposed.api)

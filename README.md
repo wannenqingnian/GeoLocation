@@ -21,7 +21,7 @@ GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配�
 ## 功能概览
 
 - **三种定位模式**：应用级 Hook、系统级 Hook、Mock Provider，按设备条件和测试范围选择。
-- **多地图服务**：支持百度、高德和 Google 地图，提供地图选点、地点搜索与地址解析。
+- **多地图服务**：默认使用 osmdroid（OpenStreetMap），同时支持百度、高德和 Google 地图，提供地图选点、地点搜索与地址解析。
 - **常用位置收藏**：保存测试地点，方便重复使用。
 - **坐标系转换**：内部统一使用 WGS-84；可为目标应用配置 WGS-84、GCJ-02 或 BD-09 输出。
 - **位置参数配置**：精度、海拔、速度、随机偏移，以及垂直精度、速度精度等参数；部分字段受 Android 版本和运行模式限制。
@@ -73,11 +73,14 @@ GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配�
 
 | 地图服务 | 配置项 |
 | --- | --- |
+| osmdroid（默认） | 无需密钥；使用 OpenStreetMap 在线底图，搜索与地址解析依赖设备的 Android 地理编码服务 |
 | 百度地图 | 浏览器端 JavaScript API 的 AK |
 | 高德地图 | Web Key 和 `securityJsCode` |
 | Google Maps | Google Maps API Key，用于应用内的 JavaScript 地图及检索、地址解析功能 |
 
 地图服务的可用性取决于网络、密钥权限、使用额度及服务商限制。地图加载或搜索失败时，请先核对所选供应商的凭据和控制台配置。
+
+osmdroid 使用 WGS-84 坐标和应用私有缓存，无需外部存储权限。部分不带地理编码服务的设备无法搜索和解析地址，仍可地图选点、输入坐标及使用收藏。已有安装保存的地图选择会保留，新安装或无效配置默认使用 osmdroid。上游 osmdroid 已归档，本项目使用正式版 6.1.20。
 
 地图显示坐标系与应用输出坐标系分开处理，地图和收藏数据统一按 WGS-84 保存。**通常保留应用输出为 WGS-84**；只有在确认目标应用直接接收其他坐标系时，再点击应用列表中的“输出坐标系”标签切换。不要仅因为底图使用高德或百度就手动改变输出坐标系，以免重复转换造成偏移。
 
@@ -147,7 +150,7 @@ Windows 下使用 `gradlew.bat` 执行相同任务。没有本地签名配置时
 
 **GeoLocation** is an independently maintained, MIT-licensed Android location-testing project derived from the public LocusMimic `10100-1.1.0` source release.
 
-It offers Application Hook, System Hook and Mock Provider modes; Baidu, AMap and Google maps; place search and favourites; configurable location parameters; and per-app WGS-84, GCJ-02 or BD-09 output. There are no subscriptions or paid feature unlocks.
+It offers Application Hook, System Hook and Mock Provider modes; osmdroid (OpenStreetMap) by default alongside Baidu, AMap and Google maps; place search and favourites; configurable location parameters; and per-app WGS-84, GCJ-02 or BD-09 output. osmdroid requires no API key; search and address lookup depend on the device geocoding service. There are no subscriptions or paid feature unlocks.
 
 Android 11+ is required. Hook modes require Root and an LSPosed implementation supporting **libxposed API 101**. System adapters are enabled only on Android 12–16 and affect third-party location paths globally. Mock Provider requires authorization in Android Developer Options and remains marked as mock location by Android. Compatibility varies by device and app.
 
