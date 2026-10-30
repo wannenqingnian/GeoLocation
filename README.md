@@ -18,12 +18,7 @@ GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配�
 
 适用于自有设备及获得明确授权的开发、调试和位置功能测试。
 
-## 复刻来源与修改内容
-
-- **直接上游**：[ceigt/GeoLocation](https://github.com/ceigt/GeoLocation)，本仓库从提交 [`35a61d2`](https://github.com/ceigt/GeoLocation/commit/35a61d2dac48cb4040dcd158c2e8e62cfa999657) 开始修改，保留原有定位模式、收藏和坐标转换功能。
-- **新增地图引擎**：[osmdroid/osmdroid](https://github.com/osmdroid/osmdroid) 6.1.20，作为默认原生地图引擎。
-- **国内瓦片参考**：[Elysia-SHY/FakeGPS-next 的 MapUtils.kt](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt)，参考其中高德路网瓦片地址及请求参数；本仓库的 GCJ-02/WGS-84 转换复用 GeoLocation 原有实现。
-- **本仓库改动**：增加 OSM 国际服务器与高德国内服务器两个选项，选择自动保存；补充显示坐标转换、独立底图缓存和地图署名。入口为“设置 → 地图服务 → osmdroid → 瓦片服务器”。
+高德瓦片地址配置参考 [FakeGPS-next 的 MapUtils.kt](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt)。
 
 本仓库使用独立发布签名，不支持直接覆盖其他签名的版本。请从本仓库的 Releases 下载对应 APK。
 
@@ -162,7 +157,7 @@ Windows 下使用 `gradlew.bat` 执行相同任务。没有本地签名配置时
 
 ## English
 
-**GeoLocation** in this repository is based on [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation), which derives from the public LocusMimic `10100-1.1.0` source release. This repository adds osmdroid 6.1.20 and a choice of OpenStreetMap or AutoNavi tiles. AutoNavi tile URLs and request parameters reference [FakeGPS-next](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt); coordinate conversion reuses GeoLocation's existing implementation. Releases use this repository's independent signing certificate.
+**GeoLocation** in this repository is based on [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation), which derives from the public LocusMimic `10100-1.1.0` source release. AutoNavi tile URL configuration references [FakeGPS-next's MapUtils.kt](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt).
 
 It offers Application Hook, System Hook and Mock Provider modes; osmdroid (OpenStreetMap) by default alongside Baidu, AMap and Google maps; place search and favourites; configurable location parameters; and per-app WGS-84, GCJ-02 or BD-09 output. osmdroid requires no API key; search and address lookup depend on the device geocoding service. There are no subscriptions or paid feature unlocks.
 
