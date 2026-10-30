@@ -57,7 +57,12 @@
     <string name="setting_map_provider_title">地图供应商</string>
     <string name="setting_map_provider_description">选择地图显示、地点搜索和地址解析所使用的服务。</string>
     <string name="map_provider_osmdroid">osmdroid</string>
-    <string name="map_osmdroid_description">使用 osmdroid 显示 OpenStreetMap，无需密钥。搜索与地址解析使用设备的地理编码服务，部分设备可能不支持。</string>
+    <string name="map_osmdroid_description">使用 osmdroid 显示地图，无需密钥。搜索与地址解析使用设备的地理编码服务，部分设备可能不支持。</string>
+    <string name="setting_osm_tile_server_title">瓦片服务器</string>
+    <string name="osm_tile_server_international">国际服务器（当前 OSM）</string>
+    <string name="osm_tile_server_international_description">使用原有 OpenStreetMap 底图，保留当前服务器。</string>
+    <string name="osm_tile_server_domestic">国内服务器（高德）</string>
+    <string name="osm_tile_server_domestic_description">使用高德路网瓦片，自动处理显示坐标偏移；选点和收藏仍保存为 WGS-84。</string>
     <string name="map_provider_baidu">百度</string>
     <string name="map_provider_amap">高德</string>
     <string name="map_provider_google">Google</string>

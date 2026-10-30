@@ -105,6 +105,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.MapProvider
+import io.github.ceigt.geolocation.data.OsmTileServer
 import io.github.ceigt.geolocation.data.model.FavoriteLocation
 import io.github.ceigt.geolocation.manager.App
 import io.github.ceigt.geolocation.manager.ui.map.components.MapViewContainer
@@ -144,6 +145,7 @@ fun MapScreen(
     val locationMode by settingsViewModel.locationMode.collectAsStateWithLifecycle()
     val baiduMapAk by settingsViewModel.baiduMapAk.collectAsStateWithLifecycle()
     val mapProvider by settingsViewModel.mapProvider.collectAsStateWithLifecycle()
+    val osmTileServer by settingsViewModel.osmTileServer.collectAsStateWithLifecycle()
     val amapWebKey by settingsViewModel.amapWebKey.collectAsStateWithLifecycle()
     val amapSecurityCode by settingsViewModel.amapSecurityCode.collectAsStateWithLifecycle()
     val googleMapsApiKey by settingsViewModel.googleMapsApiKey.collectAsStateWithLifecycle()
@@ -199,6 +201,7 @@ fun MapScreen(
                 MapViewContainer(
                     mapViewModel = mapViewModel,
                     mapProvider = mapProvider,
+                    osmTileServer = osmTileServer,
                     baiduMapAk = baiduMapAk,
                     amapWebKey = amapWebKey,
                     amapSecurityCode = amapSecurityCode,
@@ -335,12 +338,13 @@ fun MapScreen(
                 }
                 if (mapProvider == MapProvider.OSMDROID) {
                     Text(
-                        "© OpenStreetMap contributors",
+                        if (osmTileServer == OsmTileServer.OPENSTREETMAP) "© OpenStreetMap contributors" else "© 高德地图",
                         modifier = Modifier.align(Alignment.BottomCenter)
                             .padding(bottom = 6.dp)
                             .clickable {
                                 context.startActivity(Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("https://www.openstreetmap.org/copyright")))
+                                    Uri.parse(if (osmTileServer == OsmTileServer.OPENSTREETMAP)
+                                        "https://www.openstreetmap.org/copyright" else "https://www.amap.com/")))
                             },
                         fontSize = 11.sp,
                         color = Color(0xFF334155)

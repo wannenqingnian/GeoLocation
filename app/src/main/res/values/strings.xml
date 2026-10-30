@@ -58,7 +58,12 @@
     <string name="setting_map_provider_title">Map provider</string>
     <string name="setting_map_provider_description">Choose the provider used for map display, place search, and address lookup.</string>
     <string name="map_provider_osmdroid">osmdroid</string>
-    <string name="map_osmdroid_description">OpenStreetMap via osmdroid. No API key required. Search and address lookup use the device geocoding service and may be unavailable on some devices.</string>
+    <string name="map_osmdroid_description">Maps via osmdroid. No API key required. Search and address lookup use the device geocoding service and may be unavailable on some devices.</string>
+    <string name="setting_osm_tile_server_title">Tile server</string>
+    <string name="osm_tile_server_international">International (current OSM)</string>
+    <string name="osm_tile_server_international_description">Keep the existing OpenStreetMap tile server.</string>
+    <string name="osm_tile_server_domestic">Domestic (AutoNavi)</string>
+    <string name="osm_tile_server_domestic_description">Use AutoNavi road tiles with display coordinate conversion. Selected points and favourites remain WGS-84.</string>
     <string name="map_provider_baidu">Baidu</string>
     <string name="map_provider_amap">AMap</string>
     <string name="map_provider_google">Google</string>

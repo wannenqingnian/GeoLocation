@@ -255,6 +255,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val mapProvider: StateFlow<MapProvider> = preferencesRepository.getMapProviderFlow()
         .stateIn(viewModelScope, SharingStarted.Eagerly, MapProvider.OSMDROID)
 
+    val osmTileServer: StateFlow<OsmTileServer> = preferencesRepository.getOsmTileServerFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, OsmTileServer.OPENSTREETMAP)
+
     private val _amapWebKeyPreference = Preference(
         DEFAULT_AMAP_WEB_KEY,
         preferencesRepository.getAmapWebKeyFlow(),
@@ -302,6 +305,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setBaiduMapAk(value: String) = _baiduMapAkPreference.setValue(value.trim())
     fun setMapProvider(value: MapProvider) = enqueueSave {
         preferencesRepository.saveMapProvider(value)
+    }
+    fun setOsmTileServer(value: OsmTileServer) = enqueueSave {
+        preferencesRepository.saveOsmTileServer(value)
     }
     fun setAmapWebKey(value: String) = _amapWebKeyPreference.setValue(value.trim())
     fun setAmapSecurityCode(value: String) = _amapSecurityCodePreference.setValue(value.trim())

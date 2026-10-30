@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import io.github.ceigt.geolocation.data.MapProvider
+import io.github.ceigt.geolocation.data.OsmTileServer
+import io.github.ceigt.geolocation.manager.ui.map.fromWgs84
 import io.github.ceigt.geolocation.manager.ui.map.GeoPoint
 import io.github.ceigt.geolocation.manager.ui.map.MapViewModel
 import org.junit.Assert.*
@@ -16,6 +18,35 @@ import org.osmdroid.views.overlay.Marker
 
 class OsmMapTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test fun tileServerSwitchKeepsStoredPointAndReprojectsItsMarker() {
+        val server = mutableStateOf(OsmTileServer.OPENSTREETMAP)
+        val model = MapViewModel(rule.activity.application)
+        val point = GeoPoint(39.908823, 116.397470)
+        rule.setContent {
+            MapViewContainer(model, MapProvider.OSMDROID, "", "", "", "", osmTileServer = server.value)
+        }
+        rule.runOnIdle { model.updateClickedLocation(point) }
+        rule.waitUntil(10_000) { model.uiState.value.lastClickedLocation == point }
+        rule.waitForIdle()
+        lateinit var original: MapView
+        rule.runOnIdle {
+            original = findMap(rule.activity.window.decorView)!!
+            assertEquals("Mapnik", original.tileProvider.tileSource.name())
+            server.value = OsmTileServer.AUTONAVI
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val domestic = findMap(rule.activity.window.decorView)!!
+            assertNotSame(original, domestic)
+            assertEquals("GeoLocation-AutoNavi-Vector", domestic.tileProvider.tileSource.name())
+            assertEquals(point, model.uiState.value.lastClickedLocation)
+            val display = OsmTileServer.AUTONAVI.fromWgs84(point)
+            assertTrue(domestic.overlays.filterIsInstance<Marker>().any {
+                it.position.latitude == display.latitude && it.position.longitude == display.longitude
+            })
+        }
+    }
 
     @Test fun selectedWgs84PointIsDisplayedAndProviderSwitchRecreatesNativeMap() {
         val provider = mutableStateOf(MapProvider.OSMDROID)

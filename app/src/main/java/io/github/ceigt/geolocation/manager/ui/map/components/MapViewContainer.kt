@@ -55,6 +55,7 @@ import io.github.ceigt.geolocation.BuildConfig
 import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.DEFAULT_MAP_ZOOM
 import io.github.ceigt.geolocation.data.MapProvider
+import io.github.ceigt.geolocation.data.OsmTileServer
 import io.github.ceigt.geolocation.data.WORLD_MAP_ZOOM
 import io.github.ceigt.geolocation.manager.ui.map.CoordinateTransform
 import io.github.ceigt.geolocation.manager.ui.map.GeoPoint
@@ -75,6 +76,7 @@ fun MapViewContainer(
     amapWebKey: String,
     amapSecurityCode: String,
     googleMapsApiKey: String,
+    osmTileServer: OsmTileServer = OsmTileServer.OPENSTREETMAP,
     onMapInteraction: () -> Unit = {}
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -82,7 +84,7 @@ fun MapViewContainer(
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
     }
 
-    DisposableEffect(lifecycleOwner, mapViewModel, mapProvider) {
+    DisposableEffect(lifecycleOwner, mapViewModel, mapProvider, osmTileServer) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
@@ -107,7 +109,7 @@ fun MapViewContainer(
 
     if (isMapForeground) {
         if (mapProvider == MapProvider.OSMDROID) {
-            OsmMapContainer(mapViewModel, onMapInteraction)
+            key(osmTileServer) { OsmMapContainer(mapViewModel, osmTileServer, onMapInteraction) }
         } else ActiveWebMapContainer(
             mapViewModel,
             WebMapConfig(mapProvider, baiduMapAk, amapWebKey, amapSecurityCode, googleMapsApiKey),

@@ -3,25 +3,34 @@
   <h1>GeoLocation</h1>
   <p>面向 Android 的定位模拟与调测工具</p>
 
-  <a href="https://github.com/ceigt/GeoLocation/releases/latest"><img src="https://img.shields.io/github/v/release/ceigt/GeoLocation" alt="最新正式版本" /></a>
+  <a href="https://github.com/wannenqingnian/GeoLocation/releases/latest"><img src="https://img.shields.io/github/v/release/wannenqingnian/GeoLocation" alt="最新正式版本" /></a>
   <img src="https://img.shields.io/badge/Android-11%2B-3DDC84?logo=android&amp;logoColor=white" alt="Android 11+" />
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/ceigt/GeoLocation" alt="MIT License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/wannenqingnian/GeoLocation" alt="MIT License" /></a>
 
   <p>
-    <a href="https://github.com/ceigt/GeoLocation/releases/latest">下载正式版</a> ·
-    <a href="https://github.com/ceigt/GeoLocation/issues">问题反馈</a> ·
+    <a href="https://github.com/wannenqingnian/GeoLocation/releases/latest">下载正式版</a> ·
+    <a href="https://github.com/wannenqingnian/GeoLocation/issues">问题反馈</a> ·
     <a href="#english">English</a>
   </p>
 </div>
 
-GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配置，可通过 LSPosed Hook 或 Android Mock Provider 提供测试位置。项目基于 LocusMimic 的公开源码版本派生，独立维护并公开源码，不包含订阅或付费解锁。
+GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配置，可通过 LSPosed Hook 或 Android Mock Provider 提供测试位置。本仓库基于 [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation) 修改；该上游项目由 LocusMimic 的公开源码版本派生。不包含订阅或付费解锁。
 
 适用于自有设备及获得明确授权的开发、调试和位置功能测试。
+
+## 复刻来源与修改内容
+
+- **直接上游**：[ceigt/GeoLocation](https://github.com/ceigt/GeoLocation)，本仓库从提交 [`35a61d2`](https://github.com/ceigt/GeoLocation/commit/35a61d2dac48cb4040dcd158c2e8e62cfa999657) 开始修改，保留原有定位模式、收藏和坐标转换功能。
+- **新增地图引擎**：[osmdroid/osmdroid](https://github.com/osmdroid/osmdroid) 6.1.20，作为默认原生地图引擎。
+- **国内瓦片参考**：[Elysia-SHY/FakeGPS-next 的 MapUtils.kt](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt)，参考其中高德路网瓦片地址及请求参数；本仓库的 GCJ-02/WGS-84 转换复用 GeoLocation 原有实现。
+- **本仓库改动**：增加 OSM 国际服务器与高德国内服务器两个选项，选择自动保存；补充显示坐标转换、独立底图缓存和地图署名。入口为“设置 → 地图服务 → osmdroid → 瓦片服务器”。
+
+本仓库使用独立发布签名，不支持直接覆盖其他签名的版本。请从本仓库的 Releases 下载对应 APK。
 
 ## 功能概览
 
 - **三种定位模式**：应用级 Hook、系统级 Hook、Mock Provider，按设备条件和测试范围选择。
-- **多地图服务**：默认使用 osmdroid（OpenStreetMap），同时支持百度、高德和 Google 地图，提供地图选点、地点搜索与地址解析。
+- **多地图服务**：默认使用 osmdroid，可选择 OSM 国际或高德国内瓦片；同时支持百度、高德和 Google 网页地图，提供地图选点、地点搜索与地址解析。
 - **常用位置收藏**：保存测试地点，方便重复使用。
 - **坐标系转换**：内部统一使用 WGS-84；可为目标应用配置 WGS-84、GCJ-02 或 BD-09 输出。
 - **位置参数配置**：精度、海拔、速度、随机偏移，以及垂直精度、速度精度等参数；部分字段受 Android 版本和运行模式限制。
@@ -41,7 +50,7 @@ GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配�
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/ceigt/GeoLocation/releases/latest) 下载正式签名 APK。包名为 `io.github.ceigt.geolocation`，使用相同正式签名的版本可直接覆盖升级并保留配置。
+从[本仓库 Releases](https://github.com/wannenqingnian/GeoLocation/releases/latest) 下载正式签名 APK。包名为 `io.github.ceigt.geolocation`，使用相同正式签名的版本可直接覆盖升级并保留配置。
 
 ### 应用级 Hook
 
@@ -82,6 +91,8 @@ GeoLocation 支持地图选点、地点搜索、位置收藏和位置参数配�
 
 osmdroid 使用 WGS-84 坐标和应用私有缓存，无需外部存储权限。部分不带地理编码服务的设备无法搜索和解析地址，仍可地图选点、输入坐标及使用收藏。已有安装保存的地图选择会保留，新安装或无效配置默认使用 osmdroid。上游 osmdroid 已归档，本项目使用正式版 6.1.20。
 
+osmdroid 的“瓦片服务器”提供两个选项：国际服务器保留当前 OpenStreetMap 底图（默认）；国内服务器使用高德路网瓦片，地址格式参考 [FakeGPS-next](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt)。选择会保存在本机，切换立即生效；高德显示使用 GCJ-02，选点、收藏、搜索结果和定位输出仍以应用原有的 WGS-84 流程处理，两种底图缓存分开保存。该高德瓦片地址不是稳定的公开 API，可用性取决于服务商；切换瓦片不会更换系统地理编码服务。
+
 地图显示坐标系与应用输出坐标系分开处理，地图和收藏数据统一按 WGS-84 保存。**通常保留应用输出为 WGS-84**；只有在确认目标应用直接接收其他坐标系时，再点击应用列表中的“输出坐标系”标签切换。不要仅因为底图使用高德或百度就手动改变输出坐标系，以免重复转换造成偏移。
 
 ## 隐私与外部控制
@@ -92,7 +103,7 @@ osmdroid 使用 WGS-84 坐标和应用私有缓存，无需外部存储权限。
 
 ## 维护与反馈
 
-欢迎通过 [Issues](https://github.com/ceigt/GeoLocation/issues) 提交问题或建议。开发过程中使用 AI 辅助，改动结合代码审查、自动化测试与设备回归验证；测试通过不代表所有设备及应用均兼容。
+欢迎通过[本仓库 Issues](https://github.com/wannenqingnian/GeoLocation/issues) 提交问题或建议。开发过程中使用 AI 辅助，改动结合代码审查、自动化测试与设备回归验证；测试通过不代表所有设备及应用均兼容。
 
 反馈定位问题时，请提供：
 
@@ -101,11 +112,11 @@ osmdroid 使用 WGS-84 坐标和应用私有缓存，无需外部存储权限。
 - Wi-Fi、系统定位和模拟开关状态，以及目标应用版本和复现步骤。
 - 与问题时段相关的必要日志；提交前移除账号、真实地址、地图密钥等敏感内容。
 
-历史版本变化见 [Releases](https://github.com/ceigt/GeoLocation/releases)。
+历史版本变化见[本仓库 Releases](https://github.com/wannenqingnian/GeoLocation/releases)。
 
 ## 构建与签名
 
-日常构建优先使用 [GitHub Actions](https://github.com/ceigt/GeoLocation/actions/workflows/verify.yml)。向 `main` 或 `fixes/**` 分支推送后，会运行单元测试、Release Lint 和 APK 构建，也可在 Actions 页面手动触发。成功后可下载 APK 和验证报告，附件保留 14 天。
+日常构建优先使用 [GitHub Actions](https://github.com/wannenqingnian/GeoLocation/actions/workflows/verify.yml)。向 `main` 或 `fixes/**` 分支推送后，会运行单元测试、Release Lint 和 APK 构建，也可在 Actions 页面手动触发。成功后可下载 APK 和验证报告，附件保留 14 天。
 
 **云端附件中的 Release APK 未签名，签名后才能安装。** 普通用户请使用 Releases 中已经正式签名的 APK。维护者可在本机使用现有证书签名，无需重新编译；私钥和地图凭据不应提交到仓库。
 
@@ -130,10 +141,13 @@ Windows 下使用 `gradlew.bat` 执行相同任务。没有本地签名配置时
 
 ## 许可证与上游归属
 
-本项目采用 [MIT License](LICENSE)，从 [wchunlin1006/LocusMimic](https://github.com/wchunlin1006/LocusMimic) 的公开完整源码版本 `10100-1.1.0`（提交 `2e4c55a`）派生，并独立维护。
+本项目采用 [MIT License](LICENSE)。本仓库直接基于 [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation) 修改；该上游项目从 [wchunlin1006/LocusMimic](https://github.com/wchunlin1006/LocusMimic) 的公开完整源码版本 `10100-1.1.0`（提交 `2e4c55a`）派生。
 
 感谢开源上游：
 
+- [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation)
+- [osmdroid](https://github.com/osmdroid/osmdroid)
+- [FakeGPS-next](https://github.com/Elysia-SHY/FakeGPS-next)（高德瓦片配置参考）
 - [LocusMimic](https://github.com/wchunlin1006/LocusMimic)
 - [XposedFakeLocation](https://github.com/noobexon1/XposedFakeLocation)
 - [HideMockLocation](https://github.com/auag0/HideMockLocation)
@@ -148,12 +162,12 @@ Windows 下使用 `gradlew.bat` 执行相同任务。没有本地签名配置时
 
 ## English
 
-**GeoLocation** is an independently maintained, MIT-licensed Android location-testing project derived from the public LocusMimic `10100-1.1.0` source release.
+**GeoLocation** in this repository is based on [ceigt/GeoLocation](https://github.com/ceigt/GeoLocation), which derives from the public LocusMimic `10100-1.1.0` source release. This repository adds osmdroid 6.1.20 and a choice of OpenStreetMap or AutoNavi tiles. AutoNavi tile URLs and request parameters reference [FakeGPS-next](https://github.com/Elysia-SHY/FakeGPS-next/blob/main/app/src/main/java/com/mockrun/app/feature/map/MapUtils.kt); coordinate conversion reuses GeoLocation's existing implementation. Releases use this repository's independent signing certificate.
 
 It offers Application Hook, System Hook and Mock Provider modes; osmdroid (OpenStreetMap) by default alongside Baidu, AMap and Google maps; place search and favourites; configurable location parameters; and per-app WGS-84, GCJ-02 or BD-09 output. osmdroid requires no API key; search and address lookup depend on the device geocoding service. There are no subscriptions or paid feature unlocks.
 
 Android 11+ is required. Hook modes require Root and an LSPosed implementation supporting **libxposed API 101**. System adapters are enabled only on Android 12–16 and affect third-party location paths globally. Mock Provider requires authorization in Android Developer Options and remains marked as mock location by Android. Compatibility varies by device and app.
 
-Download signed APKs from [Releases](https://github.com/ceigt/GeoLocation/releases/latest). CI artifacts are unsigned and need signing before installation. External control is disabled by default and requires a same-signed companion app; see the [control interface](docs/EXTERNAL_CONTROL.md).
+Download signed APKs from [this repository's Releases](https://github.com/wannenqingnian/GeoLocation/releases/latest). CI artifacts are unsigned and need signing before installation. External control is disabled by default and requires a same-signed companion app; see the [control interface](docs/EXTERNAL_CONTROL.md).
 
 Use only on your own devices or in explicitly authorized test environments. Preserve [LICENSE](LICENSE) and [NOTICE](NOTICE) when redistributing.

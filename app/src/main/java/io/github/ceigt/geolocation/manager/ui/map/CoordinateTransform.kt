@@ -1,5 +1,7 @@
 package io.github.ceigt.geolocation.manager.ui.map
 
+import io.github.ceigt.geolocation.data.OsmTileServer
+
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -7,7 +9,17 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Converts between GeoLocation's WGS-84 storage and Baidu Map's BD-09 display. */
+internal fun OsmTileServer.fromWgs84(point: GeoPoint): GeoPoint = when (this) {
+    OsmTileServer.OPENSTREETMAP -> point
+    OsmTileServer.AUTONAVI -> CoordinateTransform.wgs84ToGcj02(point.latitude, point.longitude)
+}
+
+internal fun OsmTileServer.toWgs84(point: GeoPoint): GeoPoint = when (this) {
+    OsmTileServer.OPENSTREETMAP -> point
+    OsmTileServer.AUTONAVI -> CoordinateTransform.gcj02ToWgs84(point)
+}
+
+/** Converts between WGS-84 storage and the coordinate systems used by map providers. */
 object CoordinateTransform {
     private const val X_PI = PI * 3000.0 / 180.0
     private const val A = 6378245.0

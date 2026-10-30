@@ -82,6 +82,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.MapProvider
+import io.github.ceigt.geolocation.data.OsmTileServer
 import io.github.ceigt.geolocation.manager.control.ControlReceiver
 import io.github.ceigt.geolocation.manager.localization.LanguageOption
 import io.github.ceigt.geolocation.manager.localization.LocaleController
@@ -415,6 +416,8 @@ fun SettingsScreen(
                     MapServiceSettings(
                         provider = settingsViewModel.mapProvider.collectAsState().value,
                         onProviderSelected = settingsViewModel::setMapProvider,
+                        osmTileServer = settingsViewModel.osmTileServer.collectAsState().value,
+                        onOsmTileServerSelected = settingsViewModel::setOsmTileServer,
                         baiduMapAk = settingsViewModel.baiduMapAk.collectAsState().value,
                         amapWebKey = settingsViewModel.amapWebKey.collectAsState().value,
                         amapSecurityCode = settingsViewModel.amapSecurityCode.collectAsState().value,
@@ -653,6 +656,8 @@ fun SettingsBottomSheet(
                     MapServiceSettings(
                         provider = settingsViewModel.mapProvider.collectAsState().value,
                         onProviderSelected = settingsViewModel::setMapProvider,
+                        osmTileServer = settingsViewModel.osmTileServer.collectAsState().value,
+                        onOsmTileServerSelected = settingsViewModel::setOsmTileServer,
                         baiduMapAk = settingsViewModel.baiduMapAk.collectAsState().value,
                         amapWebKey = settingsViewModel.amapWebKey.collectAsState().value,
                         amapSecurityCode = settingsViewModel.amapSecurityCode.collectAsState().value,
@@ -748,6 +753,8 @@ private fun SettingsSheetSection(
 private fun MapServiceSettings(
     provider: MapProvider,
     onProviderSelected: (MapProvider) -> Unit,
+    osmTileServer: OsmTileServer,
+    onOsmTileServerSelected: (OsmTileServer) -> Unit,
     baiduMapAk: String,
     amapWebKey: String,
     amapSecurityCode: String,
@@ -765,11 +772,24 @@ private fun MapServiceSettings(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
         when (provider) {
-            MapProvider.OSMDROID -> Text(
-                stringResource(R.string.map_osmdroid_description),
-                modifier = Modifier.padding(Dimensions.SPACING_MEDIUM),
-                style = MaterialTheme.typography.bodySmall
-            )
+            MapProvider.OSMDROID -> Column(Modifier.padding(Dimensions.SPACING_MEDIUM)) {
+                Text(stringResource(R.string.map_osmdroid_description), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.setting_osm_tile_server_title),
+                    modifier = Modifier.padding(top = Dimensions.SPACING_MEDIUM),
+                    style = MaterialTheme.typography.titleMedium)
+                LocationModeOption(
+                    title = stringResource(R.string.osm_tile_server_international),
+                    description = stringResource(R.string.osm_tile_server_international_description),
+                    selected = osmTileServer == OsmTileServer.OPENSTREETMAP,
+                    onClick = { onOsmTileServerSelected(OsmTileServer.OPENSTREETMAP) }
+                )
+                LocationModeOption(
+                    title = stringResource(R.string.osm_tile_server_domestic),
+                    description = stringResource(R.string.osm_tile_server_domestic_description),
+                    selected = osmTileServer == OsmTileServer.AUTONAVI,
+                    onClick = { onOsmTileServerSelected(OsmTileServer.AUTONAVI) }
+                )
+            }
             MapProvider.BAIDU -> BaiduMapAkSetting(baiduMapAk, onSaveBaidu, onSaved)
             MapProvider.AMAP -> AmapCredentialSetting(
                 amapWebKey,

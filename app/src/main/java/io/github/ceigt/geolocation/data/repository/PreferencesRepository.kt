@@ -428,6 +428,13 @@ class PreferencesRepository(context: Context) {
     suspend fun saveMapProvider(provider: MapProvider) =
         editLocalChecked(KEY_MAP_PROVIDER) { putString(KEY_MAP_PROVIDER, provider.storedValue) }
 
+    fun getOsmTileServerFlow(): Flow<OsmTileServer> = localFlow(KEY_OSM_TILE_SERVER) {
+        OsmTileServer.fromStored(it.getString(KEY_OSM_TILE_SERVER, DEFAULT_OSM_TILE_SERVER))
+    }
+
+    suspend fun saveOsmTileServer(server: OsmTileServer) =
+        editLocalChecked(KEY_OSM_TILE_SERVER) { putString(KEY_OSM_TILE_SERVER, server.storedValue) }
+
     fun getAmapWebKeyFlow(): Flow<String> = localFlow(KEY_AMAP_WEB_KEY) {
         CredentialStore.read(it, KEY_AMAP_WEB_KEY, DEFAULT_AMAP_WEB_KEY)
     }
