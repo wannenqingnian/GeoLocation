@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Tune
 import io.github.ceigt.geolocation.manager.ui.navigation.Screen
 import androidx.compose.material3.CircularProgressIndicator
@@ -345,6 +346,30 @@ fun MapScreen(
                         .align(Alignment.BottomEnd)
                         .padding(end = 42.dp, bottom = 47.dp)
                 )
+
+                // Environment Snapshot Manager Quick Button
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White,
+                    contentColor = Color(0xFF006C5F),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 42.dp, bottom = 192.dp)
+                        .size(46.dp)
+                        .clickable {
+                            navController?.navigate(Screen.Environment.route)
+                        }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = "环境全要素采集与模拟",
+                            tint = Color(0xFF006C5F),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
                 // Route Simulation Manager Quick Button
                 Surface(

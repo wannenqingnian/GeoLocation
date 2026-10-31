@@ -286,9 +286,15 @@ object JsonCodec {
             val pObj = JSONObject()
                 .put("id", profile.id)
                 .put("name", profile.name)
+                .put("latitude", profile.latitude ?: JSONObject.NULL)
+                .put("longitude", profile.longitude ?: JSONObject.NULL)
+                .put("altitude", profile.altitude ?: JSONObject.NULL)
                 .put("wifiEnabled", profile.wifiEnabled)
                 .put("cellEnabled", profile.cellEnabled)
+                .put("bleEnabled", profile.bleEnabled)
+                .put("gnssEnabled", profile.gnssEnabled)
                 .put("suppressRealScan", profile.suppressRealScan)
+                .put("createdAt", profile.createdAtEpochMillis)
 
             val wifiArr = JSONArray()
             for (ap in profile.wifiAps) {
@@ -319,6 +325,32 @@ object JsonCodec {
             }
             pObj.put("cellTowers", cellArr)
 
+            val bleArr = JSONArray()
+            for (b in profile.bleBeacons) {
+                bleArr.put(
+                    JSONObject()
+                        .put("id", b.id)
+                        .put("displayName", b.displayName)
+                        .put("virtualAddress", b.virtualAddress)
+                        .put("baseRssi", b.signal.baseRssi)
+                )
+            }
+            pObj.put("bleBeacons", bleArr)
+
+            val satArr = JSONArray()
+            for (s in profile.satellites) {
+                satArr.put(
+                    JSONObject()
+                        .put("svid", s.svid)
+                        .put("constellationType", s.constellationType)
+                        .put("cn0DbHz", s.cn0DbHz.toDouble())
+                        .put("elevationDegrees", s.elevationDegrees.toDouble())
+                        .put("azimuthDegrees", s.azimuthDegrees.toDouble())
+                        .put("usedInFix", s.usedInFix)
+                )
+            }
+            pObj.put("satellites", satArr)
+
             array.put(pObj)
         }
         return array.toString()
@@ -333,9 +365,15 @@ object JsonCodec {
                 val pObj = array.getJSONObject(i)
                 val id = pObj.getString("id")
                 val name = pObj.getString("name")
+                val lat = if (pObj.isNull("latitude")) null else pObj.optDouble("latitude")
+                val lon = if (pObj.isNull("longitude")) null else pObj.optDouble("longitude")
+                val alt = if (pObj.isNull("altitude")) null else pObj.optDouble("altitude")
                 val wifiEnabled = pObj.optBoolean("wifiEnabled", true)
                 val cellEnabled = pObj.optBoolean("cellEnabled", true)
+                val bleEnabled = pObj.optBoolean("bleEnabled", true)
+                val gnssEnabled = pObj.optBoolean("gnssEnabled", true)
                 val suppressRealScan = pObj.optBoolean("suppressRealScan", true)
+                val createdAt = pObj.optLong("createdAt", System.currentTimeMillis())
 
                 val wifiAps = mutableListOf<io.github.ceigt.geolocation.data.model.environment.VirtualWifiAp>()
                 val wifiArr = pObj.optJSONArray("wifiAps")
@@ -374,14 +412,58 @@ object JsonCodec {
                     }
                 }
 
+                val bleBeacons = mutableListOf<io.github.ceigt.geolocation.domain.ble.BleDeviceProfile>()
+                val bleArr = pObj.optJSONArray("bleBeacons")
+                if (bleArr != null) {
+                    for (b in 0 until bleArr.length()) {
+                        val bObj = bleArr.getJSONObject(b)
+                        bleBeacons.add(
+                            io.github.ceigt.geolocation.domain.ble.BleDeviceProfile(
+                                id = bObj.optString("id", java.util.UUID.randomUUID().toString()),
+                                displayName = bObj.optString("displayName", "BLE Beacon"),
+                                virtualAddress = bObj.optString("virtualAddress", "FA:CE:88:99:00:11"),
+                                signal = io.github.ceigt.geolocation.domain.ble.BleSignalProfile(
+                                    baseRssi = bObj.optInt("baseRssi", -65)
+                                )
+                            )
+                        )
+                    }
+                }
+
+                val satellites = mutableListOf<io.github.ceigt.geolocation.data.model.environment.VirtualSatellite>()
+                val satArr = pObj.optJSONArray("satellites")
+                if (satArr != null) {
+                    for (s in 0 until satArr.length()) {
+                        val sObj = satArr.getJSONObject(s)
+                        satellites.add(
+                            io.github.ceigt.geolocation.data.model.environment.VirtualSatellite(
+                                svid = sObj.getInt("svid"),
+                                constellationType = sObj.optInt("constellationType", 1),
+                                cn0DbHz = sObj.optDouble("cn0DbHz", 32.0).toFloat(),
+                                elevationDegrees = sObj.optDouble("elevationDegrees", 45.0).toFloat(),
+                                azimuthDegrees = sObj.optDouble("azimuthDegrees", 120.0).toFloat(),
+                                usedInFix = sObj.optBoolean("usedInFix", true)
+                            )
+                        )
+                    }
+                }
+
                 list.add(io.github.ceigt.geolocation.data.model.environment.EnvironmentProfile(
                     id = id,
                     name = name,
+                    latitude = lat,
+                    longitude = lon,
+                    altitude = alt,
                     wifiEnabled = wifiEnabled,
                     cellEnabled = cellEnabled,
+                    bleEnabled = bleEnabled,
+                    gnssEnabled = gnssEnabled,
                     suppressRealScan = suppressRealScan,
                     wifiAps = wifiAps,
-                    cellTowers = cellTowers
+                    cellTowers = cellTowers,
+                    bleBeacons = bleBeacons,
+                    satellites = satellites,
+                    createdAtEpochMillis = createdAt
                 ))
             }
             list

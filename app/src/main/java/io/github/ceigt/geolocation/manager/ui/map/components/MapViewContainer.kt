@@ -289,9 +289,7 @@ private fun HandleMapCommands(
             val location = getLastKnownDeviceLocation(context)
             if (location != null) {
                 mapViewModel.updateUserLocation(location.point)
-                // Keep the selected simulation point in sync with the user's current position,
-                // using the same WGS-84 selection path as a map tap or manual coordinate entry.
-                mapViewModel.updateClickedLocation(location.point)
+                // Center the map to the real device position, but do NOT override clicked/simulation location!
                 val displayPoint = provider.fromWgs84(location.point)
                 controller.showUserLocation(displayPoint, location.accuracy)
                 controller.center(displayPoint, DEFAULT_MAP_ZOOM)

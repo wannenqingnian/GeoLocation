@@ -114,7 +114,7 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
         if (!map.overlays.contains(userMarker)) map.overlays.add(userMarker)
         map.controller.setZoom(DEFAULT_MAP_ZOOM)
         map.controller.setCenter(userMarker.position)
-        if (select) model.updateClickedLocation(location.point)
+        // Only pan/center the map to the real device location, do NOT move the simulation/clicked location!
     }
 
     DisposableEffect(map, lifecycleOwner) {
