@@ -181,7 +181,11 @@ class MockLocationService : Service() {
         }
         // Reporting RUNNING after only one provider succeeds is misleading: clients pinned to the
         // failed provider receive no fix. Treat a partial update as a failed tick and retry/repair.
-        return pushedProviders.size == TARGET_PROVIDERS.size
+        val success = pushedProviders.size == TARGET_PROVIDERS.size
+        if (success) {
+            updateNotificationText("当前模拟点: ${"%.5f".format(point.latitude)}, ${"%.5f".format(point.longitude)}")
+        }
+        return success
     }
 
     private fun repairMockLocationAppOp(): Boolean {
@@ -249,13 +253,18 @@ class MockLocationService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun buildNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun buildNotification(subText: String? = null) = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_location)
         .setContentTitle(getString(R.string.app_name))
-        .setContentText(getString(R.string.mock_provider_notification_text))
+        .setContentText(subText ?: getString(R.string.mock_provider_notification_text))
         .setOngoing(true)
         .setSilent(true)
         .build()
+
+    private fun updateNotificationText(text: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.notify(NOTIFICATION_ID, buildNotification(text))
+    }
 
     private data class MockState(
         val canSpoof: Boolean,

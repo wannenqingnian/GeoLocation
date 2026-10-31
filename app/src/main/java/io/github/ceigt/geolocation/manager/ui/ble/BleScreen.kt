@@ -40,6 +40,27 @@ enum class BleUiTab {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BleScreen(navController: NavController) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("蓝牙 BLE 信标与外设模拟", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            BlePanelContent(navController)
+        }
+    }
+}
+
+@SuppressLint("MissingPermission")
+@Composable
+fun BlePanelContent(navController: NavController) {
     var selectedTab by remember { mutableStateOf(BleUiTab.MAIN) }
     var deliveryMode by remember { mutableStateOf(BleDeliveryMode.HOOK_VIRTUAL) }
     var isBroadcasting by remember { mutableStateOf(false) }
@@ -60,39 +81,25 @@ fun BleScreen(navController: NavController) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("蓝牙 BLE 信标与外设模拟", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        TabRow(selectedTabIndex = selectedTab.ordinal) {
+            Tab(
+                selected = selectedTab == BleUiTab.MAIN,
+                onClick = { selectedTab = BleUiTab.MAIN },
+                text = { Text("设备配置与广播") },
+                icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
+            )
+            Tab(
+                selected = selectedTab == BleUiTab.DISCOVERY,
+                onClick = { selectedTab = BleUiTab.DISCOVERY },
+                text = { Text("周边真实扫描克隆") },
+                icon = { Icon(Icons.Default.BluetoothSearching, contentDescription = null) }
             )
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            TabRow(selectedTabIndex = selectedTab.ordinal) {
-                Tab(
-                    selected = selectedTab == BleUiTab.MAIN,
-                    onClick = { selectedTab = BleUiTab.MAIN },
-                    text = { Text("设备配置与广播") },
-                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
-                )
-                Tab(
-                    selected = selectedTab == BleUiTab.DISCOVERY,
-                    onClick = { selectedTab = BleUiTab.DISCOVERY },
-                    text = { Text("周边真实扫描克隆") },
-                    icon = { Icon(Icons.Default.BluetoothSearching, contentDescription = null) }
-                )
-            }
 
-            when (selectedTab) {
+        when (selectedTab) {
                 BleUiTab.MAIN -> {
                     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                         Card(
@@ -223,4 +230,3 @@ fun BleScreen(navController: NavController) {
             }
         }
     }
-}

@@ -65,6 +65,11 @@ class RouteSimulationService : Service() {
                         repository.saveUseSpeed(true)
                     }
                 }
+                val notification = buildNotification(
+                    "路线当前位点: ${"%.5f".format(result.latitude)}, ${"%.5f".format(result.longitude)} | ${"%.1f".format(result.speedMps)} m/s"
+                )
+                val manager = getSystemService(NotificationManager::class.java)
+                manager?.notify(NOTIFICATION_ID, notification)
             }
             handler.postDelayed(this, 1000L)
         }

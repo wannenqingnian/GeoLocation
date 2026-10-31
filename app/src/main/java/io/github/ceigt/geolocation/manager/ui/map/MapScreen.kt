@@ -37,11 +37,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
@@ -50,7 +52,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Tune
+import io.github.ceigt.geolocation.manager.ui.navigation.Screen
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
@@ -342,6 +346,45 @@ fun MapScreen(
                         .padding(end = 42.dp, bottom = 47.dp)
                 )
 
+                // Route Simulation Manager Quick Button
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White,
+                    contentColor = Color(0xFF006C5F),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 42.dp, bottom = 120.dp)
+                        .size(46.dp)
+                        .clickable {
+                            navController?.navigate(Screen.Route.route)
+                        }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Timeline,
+                            contentDescription = "路线规划与跑道模拟",
+                            tint = Color(0xFF006C5F),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Return to Mock Location Point Button
+                MapMockLocationButton(
+                    onClick = {
+                        dismissSearch()
+                        uiState.lastClickedLocation?.let { p ->
+                            mapViewModel.goToPoint(p.latitude, p.longitude)
+                        } ?: scope.launch {
+                            snackbarHostState.showSnackbar("尚未选定模拟定位点")
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 42.dp, bottom = 120.dp)
+                )
+
                 // Floating Joystick toggle button
                 Surface(
                     shape = CircleShape,
@@ -349,7 +392,7 @@ fun MapScreen(
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 42.dp, bottom = 108.dp)
+                        .padding(end = 42.dp, bottom = 192.dp)
                         .size(46.dp)
                         .clickable {
                             if (!android.provider.Settings.canDrawOverlays(context)) {
@@ -460,15 +503,8 @@ fun MapScreen(
 
     if (showAboutDialog) {
         GeoLocationAboutSheet(
-            onDismissRequest = { showAboutDialog = false },
-            onShowSponsor = {
-                showAboutDialog = false
-                showSponsorSheet = true
-            }
+            onDismissRequest = { showAboutDialog = false }
         )
-    }
-    if (showSponsorSheet) {
-        GeoLocationSponsorSheet(onDismissRequest = { showSponsorSheet = false })
     }
     if (showTargetAppsSheet) {
         TargetAppsBottomSheet(onDismissRequest = { showTargetAppsSheet = false })
@@ -724,10 +760,6 @@ private fun MapTopControls(
                         icon = PrototypeMenuIcon.Settings,
                         label = stringResource(R.string.screen_settings)
                     ) { onShowOptionsMenuChange(false); onOpenSettings() }
-                    MapOptionsMenuItem(
-                        icon = PrototypeMenuIcon.Sponsor,
-                        label = stringResource(R.string.sponsor_menu_title)
-                    ) { onShowOptionsMenuChange(false); onShowSponsor() }
                     MapOptionsMenuItem(
                         icon = PrototypeMenuIcon.About,
                         label = stringResource(R.string.screen_about)
@@ -1019,6 +1051,30 @@ private fun MapMyLocationButton(
 }
 
 @Composable
+private fun MapMockLocationButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            modifier = Modifier.size(49.dp),
+            shape = CircleShape,
+            color = Color.White,
+            contentColor = Color(0xFF006C5F),
+            shadowElevation = 8.dp
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = "回到模拟定位点", tint = Color(0xFF006C5F))
+            }
+        }
+        Text("模拟位置", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = Color(0xFF58727D), modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
 private fun MapTargetAppsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         MapSideActionButton(MapSideAction.TargetApps, stringResource(R.string.screen_target_apps), onClick)
@@ -1100,9 +1156,9 @@ private fun AddToFavoritesBottomSheet(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun GeoLocationAboutSheet(
-    onDismissRequest: () -> Unit,
-    onShowSponsor: () -> Unit
+    onDismissRequest: () -> Unit
 ) {
+    val context = LocalContext.current
     HtmlModalSheet(
         onDismissRequest = onDismissRequest,
         title = stringResource(R.string.screen_about),
@@ -1114,11 +1170,11 @@ private fun GeoLocationAboutSheet(
             color = Color.Transparent
         ) {
             AndroidView(
-                factory = { context ->
-                    ImageView(context).apply {
+                factory = { ctx ->
+                    ImageView(ctx).apply {
                         setImageResource(R.mipmap.ic_launcher)
                         scaleType = ImageView.ScaleType.CENTER_CROP
-                        contentDescription = context.getString(R.string.app_name)
+                        contentDescription = ctx.getString(R.string.app_name)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -1137,70 +1193,48 @@ private fun GeoLocationAboutSheet(
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF607981),
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 18.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp)
         )
         Text(
-            text = stringResource(R.string.about_dialog_summary),
-            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+            text = "面向 Android 平台的纯净、全功能位置、步频、环境与信标模拟测试工具。基于 MIT 开源协议发布，严禁用于虚假打卡等违规用途。",
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
             color = Color(0xFF607981)
         )
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 18.dp)
-                .height(54.dp)
-                .clickable(onClick = onShowSponsor),
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFE8F6EE),
-            contentColor = Color(0xFF227A4A)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.FavoriteBorder, contentDescription = null, modifier = Modifier.size(20.dp))
-                Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                    Text(stringResource(R.string.sponsor_entry_title), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.sponsor_entry_summary), style = MaterialTheme.typography.bodySmall, color = Color(0xFF5C8570))
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "致谢上游开源项目与技术来源：",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1B3B38)
+        )
+
+        val openSourceProjects = listOf(
+            Triple("ceigt/GeoLocation", "https://github.com/ceigt/GeoLocation", "现代 Compose UI 与 Xposed 核心框架上游"),
+            Triple("osmdroid", "https://github.com/osmdroid/osmdroid", "原生瓦片地图与图层渲染引擎"),
+            Triple("LocusMimic", "https://github.com/wchunlin1006/LocusMimic", "多厂商系统服务适配与核心算法来源"),
+            Triple("FakeGPS-next", "https://github.com/Elysia-SHY/FakeGPS-next", "国内高德卫星与矢量瓦片配置参考"),
+            Triple("libxposed", "https://github.com/libxposed/api", "现代化非侵入式 LSPosed API 100/101 标准"),
+            Triple("HiddenApiBypass", "https://github.com/LSPosed/AndroidHiddenApiBypass", "Android 11~16 隐藏 API 豁免安全底座")
+        )
+
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            openSourceProjects.forEach { (name, url, desc) ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF1F6F5),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                    }
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF006C5F))
+                        Text(desc, style = MaterialTheme.typography.bodySmall, color = Color(0xFF55717C))
+                        Text(url, style = MaterialTheme.typography.labelSmall, color = Color(0xFF88A0A8), maxLines = 1)
+                    }
                 }
             }
         }
-    }
-}
-
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun GeoLocationSponsorSheet(onDismissRequest: () -> Unit) {
-    val context = LocalContext.current
-    val paymentUrl = stringResource(R.string.sponsor_paypal_url)
-    HtmlModalSheet(
-        onDismissRequest = onDismissRequest,
-        title = stringResource(R.string.sponsor_title),
-        skipPartiallyExpanded = true
-    ) {
-        Text(
-            text = stringResource(R.string.sponsor_dialog_summary),
-            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
-            color = Color(0xFF607981)
-        )
-        TextButton(
-            onClick = {
-                try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(paymentUrl)))
-                } catch (_: ActivityNotFoundException) {
-                    Toast.makeText(context, R.string.sponsor_open_failed, Toast.LENGTH_LONG).show()
-                }
-            },
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp)
-        ) {
-            Text(stringResource(R.string.sponsor_paypal_action))
-        }
-        Text(
-            text = stringResource(R.string.sponsor_disclaimer),
-            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
-            color = Color(0xFF71878E),
-            modifier = Modifier.padding(top = 14.dp)
-        )
     }
 }
 

@@ -476,30 +476,40 @@ private fun TargetAppRow(
                 // Editing an override must not require changing the LSPosed scope.
                 if (!app.isScopeOnly) {
                     Row(
-                        modifier = Modifier.padding(top = 3.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = stringResource(
-                                R.string.target_apps_coordinate_system,
-                                app.coordinateSystem.name
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF006C5F),
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0x1A006C5F),
                             modifier = Modifier.clickable(onClick = onCoordinateSystemChange)
-                        )
-                        val policyLabel = when (app.hookInstallPolicy) {
-                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.IMMEDIATE -> "立即挂载"
-                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.DYNAMIC_CLASSLOAD -> "动态类加载"
-                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.APPLICATION_CREATE -> "App启动补装"
+                        ) {
+                            Text(
+                                text = "坐标: ${app.coordinateSystem.name}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF006C5F),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
-                        Text(
-                            text = "挂载: $policyLabel",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.tertiary,
+
+                        val policyLabel = when (app.hookInstallPolicy) {
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.IMMEDIATE -> "立即"
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.DYNAMIC_CLASSLOAD -> "动态"
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.APPLICATION_CREATE -> "启动"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
                             modifier = Modifier.clickable(onClick = onHookInstallPolicyChange)
-                        )
+                        ) {
+                            Text(
+                                text = "挂载: $policyLabel",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
             }

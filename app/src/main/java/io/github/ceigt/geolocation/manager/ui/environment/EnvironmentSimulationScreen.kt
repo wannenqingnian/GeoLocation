@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -84,19 +85,25 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.WIFI,
                     onClick = { selectedTab = EnvironmentSimulationTab.WIFI },
-                    text = { Text("Wi-Fi 模拟 (${currentProfile.wifiAps.size})") },
+                    text = { Text("Wi-Fi (${currentProfile.wifiAps.size})") },
                     icon = { Icon(Icons.Default.Wifi, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.CELLULAR,
                     onClick = { selectedTab = EnvironmentSimulationTab.CELLULAR },
-                    text = { Text("基站模拟 (${currentProfile.cellTowers.size})") },
+                    text = { Text("基站 (${currentProfile.cellTowers.size})") },
                     icon = { Icon(Icons.Default.CellTower, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTab == EnvironmentSimulationTab.BLE,
+                    onClick = { selectedTab = EnvironmentSimulationTab.BLE },
+                    text = { Text("蓝牙 BLE") },
+                    icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.COLLECTION,
                     onClick = { selectedTab = EnvironmentSimulationTab.COLLECTION },
-                    text = { Text("现实采样克隆") },
+                    text = { Text("现场采样克隆") },
                     icon = { Icon(Icons.Default.Download, contentDescription = null) }
                 )
             }
@@ -133,27 +140,33 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                         }
                     }
                 }
+                EnvironmentSimulationTab.BLE -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        BleEmbeddedPanel(navController = navController)
+                    }
+                }
                 EnvironmentSimulationTab.COLLECTION -> {
                     Column(
                         modifier = Modifier.fillMaxSize().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text("一键采集现场真实 Wi-Fi 热点与基站并持久化", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("一键全要素采样 (Wi-Fi + 蜂窝基站 + 蓝牙)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("将现场无线电与基站特征固化为仿真 Profile，可用于任意打卡环境离线回放", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("将当前身处的物理无线电与基站特征固化为仿真 Profile，安全用于离线回放", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(20.dp))
                         Button(
                             onClick = {
-                                val wifiMgr = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                                val telephonyMgr = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
                                 val fineLoc = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                                 if (!fineLoc) {
-                                    Toast.makeText(context, "请先授予精准定位权限以采集现实环境", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "请先授予精准定位权限以采集现实无线电环境", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
 
-                                val realWifiResults: List<ScanResult> = wifiMgr?.scanResults.orEmpty()
+                                val wifiMgr = runCatching { context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager }.getOrNull()
+                                val telephonyMgr = runCatching { context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager }.getOrNull()
+
+                                val realWifiResults: List<ScanResult> = runCatching { wifiMgr?.scanResults.orEmpty() }.getOrDefault(emptyList())
                                 val capturedAps = realWifiResults.map { sr ->
                                     VirtualWifiAp(
                                         ssid = sr.SSID ?: "Hidden_SSID",
@@ -164,7 +177,7 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                     )
                                 }
 
-                                val realCellInfos: List<CellInfo> = runCatching { telephonyMgr?.allCellInfo }.getOrNull().orEmpty()
+                                val realCellInfos: List<CellInfo> = runCatching { telephonyMgr?.allCellInfo.orEmpty() }.getOrDefault(emptyList())
                                 val capturedTowers = realCellInfos.mapNotNull { ci ->
                                     if (ci is CellInfoLte) {
                                         VirtualCellTower(
@@ -211,11 +224,16 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                 ).show()
                             }
                         ) {
-                            Text("开始真实采样并保存为 Profile")
+                            Text("开始全要素采集并保存为 Profile")
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun BleEmbeddedPanel(navController: NavController) {
+    io.github.ceigt.geolocation.manager.ui.ble.BlePanelContent(navController = navController)
 }

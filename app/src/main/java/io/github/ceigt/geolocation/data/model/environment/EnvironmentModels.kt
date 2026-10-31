@@ -3,6 +3,7 @@ package io.github.ceigt.geolocation.data.model.environment
 enum class EnvironmentSimulationTab {
     WIFI,
     CELLULAR,
+    BLE,
     COLLECTION
 }
 
