@@ -1,10 +1,16 @@
 package io.github.ceigt.geolocation.manager.ui.map
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
@@ -161,6 +167,22 @@ fun MapScreen(
     val isFabClickable = uiState.isFabClickable
     val showAddToFavoritesDialog = uiState.addToFavoritesDialogState == DialogState.Visible
     var showOptionsMenu by remember { mutableStateOf(false) }
+
+    val myLocationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val hasLoc = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLoc) {
+            mapViewModel.triggerCenterMapEvent()
+        } else {
+            Toast.makeText(context, "未授予定位权限，无法获取当前位置", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ -> }
     var showFavoritesPanel by remember { mutableStateOf(false) }
     var favoritePendingDeletion by remember { mutableStateOf<FavoriteLocation?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -320,6 +342,11 @@ fun MapScreen(
                     onClick = {
                         dismissSearch()
                         val wasPlaying = uiState.isPlaying || uiState.isStarting
+                        if (!wasPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
                         mapViewModel.togglePlaying()
                         if (locationMode != LocationMode.MOCK_PROVIDER || wasPlaying) scope.launch {
                             snackbarHostState.showSnackbar(
@@ -340,7 +367,15 @@ fun MapScreen(
                 MapMyLocationButton(
                     onClick = {
                         dismissSearch()
-                        mapViewModel.triggerCenterMapEvent()
+                        val hasLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        if (hasLocation) {
+                            mapViewModel.triggerCenterMapEvent()
+                        } else {
+                            myLocationPermissionLauncher.launch(
+                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                            )
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

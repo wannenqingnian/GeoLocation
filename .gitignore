@@ -45,6 +45,9 @@ __pycache__/
 google-services.json
 app/google-services.json
 
+# === Local prompts & reference materials ===
+GeoLocation_Upgrade_Prompts_and_References/
+
 # === Kotlin build artifacts ===
 .kotlin/
 .cursor/

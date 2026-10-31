@@ -3,19 +3,23 @@ package io.github.ceigt.geolocation.manager.ui.ble
 import android.annotation.SuppressLint
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +34,24 @@ import io.github.ceigt.geolocation.domain.ble.BleDeliveryMode
 import io.github.ceigt.geolocation.domain.ble.BleDeviceProfile
 import io.github.ceigt.geolocation.manager.ble.BlePeripheralService
 import kotlinx.coroutines.launch
+
+private fun bleScanPermissions(): Array<String> = buildList {
+    add(Manifest.permission.ACCESS_FINE_LOCATION)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        add(Manifest.permission.BLUETOOTH_SCAN)
+        add(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+}.toTypedArray()
+
+private fun bleAdvertisePermissions(): Array<String> = buildList {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        add(Manifest.permission.BLUETOOTH_ADVERTISE)
+        add(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}.toTypedArray()
 
 enum class BleUiTab {
     MAIN,
@@ -70,21 +92,92 @@ fun BlePanelContent(navController: NavController) {
     var isScanning by remember { mutableStateOf(false) }
     var activeScanCallback by remember { mutableStateOf<ScanCallback?>(null) }
 
+    fun stopScanning() {
+        if (isScanning && activeScanCallback != null) {
+            runCatching {
+                val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                val adapter = manager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+                adapter?.bluetoothLeScanner?.stopScan(activeScanCallback)
+            }
+            isScanning = false
+            activeScanCallback = null
+        }
+    }
+
+    val startScanning: () -> Unit = {
+        val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = manager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+        val scanner = adapter?.bluetoothLeScanner
+        if (adapter == null || !adapter.isEnabled || scanner == null) {
+            Toast.makeText(context, "蓝牙未开启或不支持 BLE，请先开启系统蓝牙", Toast.LENGTH_SHORT).show()
+        } else {
+            discoveredDevices.clear()
+            val callback = object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                    result?.let {
+                        if (discoveredDevices.none { d -> d.device.address == it.device.address }) {
+                            discoveredDevices.add(it)
+                        }
+                    }
+                }
+            }
+            activeScanCallback = callback
+            runCatching {
+                scanner.startScan(callback)
+                isScanning = true
+                Toast.makeText(context, "开始扫描周边真实 BLE 信标...", Toast.LENGTH_SHORT).show()
+            }.onFailure { err ->
+                isScanning = false
+                activeScanCallback = null
+                Toast.makeText(context, "启动扫描失败: ${err.javaClass.simpleName}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val startBroadcasting: () -> Unit = {
+        BlePeripheralService.start(context)
+        isBroadcasting = true
+    }
+
+    val scanPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val hasScan = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasScan) {
+            startScanning()
+        } else {
+            Toast.makeText(context, "未授予蓝牙扫描权限，无法扫描周边信标", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val advertisePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        val hasAdv = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        } else true
+        if (hasAdv) {
+            startBroadcasting()
+        } else {
+            Toast.makeText(context, "未授予蓝牙广播权限，无法启动物理广播", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Ensure scanner is cleanly stopped when leaving screen or toggling
     DisposableEffect(Unit) {
         onDispose {
-            if (isScanning && activeScanCallback != null) {
-                runCatching {
-                    BluetoothAdapter.getDefaultAdapter()?.bluetoothLeScanner?.stopScan(activeScanCallback)
-                }
-            }
+            stopScanning()
         }
     }
 
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        TabRow(selectedTabIndex = selectedTab.ordinal) {
+        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
             Tab(
                 selected = selectedTab == BleUiTab.MAIN,
                 onClick = { selectedTab = BleUiTab.MAIN },
@@ -95,7 +188,7 @@ fun BlePanelContent(navController: NavController) {
                 selected = selectedTab == BleUiTab.DISCOVERY,
                 onClick = { selectedTab = BleUiTab.DISCOVERY },
                 text = { Text("周边真实扫描克隆") },
-                icon = { Icon(Icons.Default.BluetoothSearching, contentDescription = null) }
+                icon = { Icon(Icons.AutoMirrored.Filled.BluetoothSearching, contentDescription = null) }
             )
         }
 
@@ -133,8 +226,14 @@ fun BlePanelContent(navController: NavController) {
                                         BlePeripheralService.stop(context)
                                         isBroadcasting = false
                                     } else {
-                                        BlePeripheralService.start(context)
-                                        isBroadcasting = true
+                                        val missing = bleAdvertisePermissions().filter {
+                                            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                                        }
+                                        if (missing.isNotEmpty()) {
+                                            advertisePermissionLauncher.launch(missing.toTypedArray())
+                                        } else {
+                                            startBroadcasting()
+                                        }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -151,33 +250,17 @@ fun BlePanelContent(navController: NavController) {
                     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                         Button(
                             onClick = {
-                                val adapter = BluetoothAdapter.getDefaultAdapter()
-                                val scanner = adapter?.bluetoothLeScanner
-                                if (scanner == null) {
-                                    Toast.makeText(context, "蓝牙未开启或不支持 BLE", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
                                 if (isScanning) {
-                                    runCatching { scanner.stopScan(activeScanCallback) }
-                                    isScanning = false
-                                    activeScanCallback = null
+                                    stopScanning()
                                     Toast.makeText(context, "已停止扫描", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    discoveredDevices.clear()
-                                    val callback = object : ScanCallback() {
-                                        override fun onScanResult(callbackType: Int, result: ScanResult?) {
-                                            result?.let {
-                                                if (discoveredDevices.none { d -> d.device.address == it.device.address }) {
-                                                    discoveredDevices.add(it)
-                                                }
-                                            }
-                                        }
+                                    val missing = bleScanPermissions().filter {
+                                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
                                     }
-                                    activeScanCallback = callback
-                                    runCatching {
-                                        scanner.startScan(callback)
-                                        isScanning = true
-                                        Toast.makeText(context, "开始扫描周边真实 BLE 信标...", Toast.LENGTH_SHORT).show()
+                                    if (missing.isNotEmpty()) {
+                                        scanPermissionLauncher.launch(missing.toTypedArray())
+                                    } else {
+                                        startScanning()
                                     }
                                 }
                             },

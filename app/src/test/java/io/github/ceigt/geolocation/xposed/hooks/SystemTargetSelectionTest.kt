@@ -44,4 +44,36 @@ class SystemTargetSelectionTest {
             setOf("system", "com.example.two")
         ))
     }
+
+    @Test fun globalModeIgnoresConfiguredAppList() {
+        assertEquals("com.tencent.mm", selectSystemTargetPackage(
+            setOf("com.tencent.mm"),
+            setOf("system", "android"),
+            global = true
+        ))
+    }
+
+    @Test fun globalModeResolvesSharedUidDeterministically() {
+        assertEquals("com.example.one", selectSystemTargetPackage(
+            linkedSetOf("com.example.two", "com.example.one"),
+            setOf("system"),
+            global = true
+        ))
+    }
+
+    @Test fun globalModeNeverSelectsManagerOrFramework() {
+        assertNull(selectSystemTargetPackage(
+            linkedSetOf("android", "com.android.phone", "io.github.ceigt.geolocation"),
+            emptySet(),
+            global = true
+        ))
+    }
+
+    @Test fun globalModePrefersConfiguredTargetForCoordinates() {
+        assertEquals("com.example.two", selectSystemTargetPackage(
+            linkedSetOf("com.example.one", "com.example.two"),
+            setOf("com.example.two"),
+            global = true
+        ))
+    }
 }

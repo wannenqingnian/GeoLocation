@@ -1662,6 +1662,13 @@ private fun LocationModeSelector(
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         LocationModeOption(
+            title = stringResource(R.string.location_mode_global_title),
+            description = stringResource(R.string.location_mode_global_description),
+            selected = selectedMode == LocationMode.GLOBAL_HOOK,
+            onClick = { onModeSelected(LocationMode.GLOBAL_HOOK) }
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        LocationModeOption(
             title = stringResource(R.string.location_mode_mock_provider_title),
             description = stringResource(R.string.location_mode_mock_provider_description),
             selected = selectedMode == LocationMode.MOCK_PROVIDER,

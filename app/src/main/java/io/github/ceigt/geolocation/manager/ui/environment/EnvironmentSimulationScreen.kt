@@ -1,23 +1,12 @@
 package io.github.ceigt.geolocation.manager.ui.environment
 
-import android.annotation.SuppressLint
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.location.GnssStatus
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
 import android.os.Build
-import android.os.Bundle
-import android.telephony.CellInfo
-import android.telephony.CellInfoLte
-import android.telephony.CellInfoNr
-import android.telephony.TelephonyManager
 import android.widget.Toast
-import androidx.compose.foundation.clickable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,9 +26,22 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.github.ceigt.geolocation.data.model.environment.*
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
+import io.github.ceigt.geolocation.domain.environment.EnvironmentCollector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-@SuppressLint("MissingPermission")
+private val AccentGreen = Color(0xFF006C5F)
+private val SecondaryText = Color(0xFF55717C)
+
+private fun collectionPermissions(): Array<String> = buildList {
+    add(Manifest.permission.ACCESS_FINE_LOCATION)
+    add(Manifest.permission.ACCESS_COARSE_LOCATION)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        add(Manifest.permission.BLUETOOTH_SCAN)
+        add(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+}.toTypedArray()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnvironmentSimulationScreen(navController: NavController) {
@@ -53,18 +55,51 @@ fun EnvironmentSimulationScreen(navController: NavController) {
 
     var editingProfile by remember { mutableStateOf<EnvironmentProfile?>(null) }
     var editNameText by remember { mutableStateOf("") }
+    var isCollecting by remember { mutableStateOf(false) }
+    var lastWarnings by remember { mutableStateOf(emptyList<String>()) }
 
-    val currentProfile = profiles.firstOrNull { it.id == activeId } ?: profiles.firstOrNull() ?: EnvironmentProfile(
-        name = "默认环境配置",
-        wifiAps = listOf(
-            VirtualWifiAp("Office_WLAN_5G", "00:11:22:33:44:55", levelDbm = -45, frequencyMhz = 5180),
-            VirtualWifiAp("Public_Free_WiFi", "AA:BB:CC:DD:EE:FF", levelDbm = -65, frequencyMhz = 2437)
-        ),
-        cellTowers = listOf(
-            VirtualCellTower("LTE", 460, 0, lacOrTac = 4192, cidOrCi = 135792468L, pci = 100, rssiDbm = -75),
-            VirtualCellTower("NR (5G)", 460, 0, lacOrTac = 4192, cidOrCi = 246813579L, pci = 205, rssiDbm = -82)
-        )
-    )
+    val emptyProfile = remember { EnvironmentProfile(name = "未采集环境") }
+    val currentProfile = profiles.firstOrNull { it.id == activeId } ?: profiles.firstOrNull() ?: emptyProfile
+
+    val runCollection: suspend () -> Unit = {
+        isCollecting = true
+        lastWarnings = emptyList()
+        try {
+            val collection = EnvironmentCollector(context.applicationContext).collect()
+            val snapshot = collection.profile
+            val existing = repository.getEnvironmentProfiles()
+            repository.saveEnvironmentProfiles(existing + snapshot)
+            repository.saveActiveEnvironmentProfileId(snapshot.id)
+            if (snapshot.latitude != null && snapshot.longitude != null) {
+                repository.saveLastClickedLocation(snapshot.latitude, snapshot.longitude)
+            }
+            lastWarnings = collection.warnings
+            Toast.makeText(
+                context,
+                "已保存环境快照：${snapshot.wifiAps.size} AP | ${snapshot.bleBeacons.size} BLE | " +
+                    "${snapshot.cellTowers.size} 基站 | ${snapshot.satellites.size} 卫星",
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Toast.makeText(context, "采集失败：${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+        } finally {
+            isCollecting = false
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val fineGranted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (fineGranted) {
+            scope.launch { runCollection() }
+        } else {
+            Toast.makeText(context, "未授予精准定位权限，无法采集现场环境", Toast.LENGTH_LONG).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -103,22 +138,23 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                             text = "当前激活环境: ${currentProfile.name}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF006C5F)
+                            color = AccentGreen
                         )
                         val locStr = if (currentProfile.latitude != null && currentProfile.longitude != null) {
                             "坐标: ${"%.4f".format(currentProfile.latitude)}, ${"%.4f".format(currentProfile.longitude)}"
                         } else "坐标: 随地图单点"
                         Text(
-                            text = "$locStr | 卫星: ${currentProfile.satellites.size}颗 | AP: ${currentProfile.wifiAps.size} | 基站: ${currentProfile.cellTowers.size}",
+                            text = "$locStr | 卫星: ${currentProfile.satellites.size}颗 | AP: ${currentProfile.wifiAps.size} | " +
+                                "BLE: ${currentProfile.bleBeacons.size} | 基站: ${currentProfile.cellTowers.size}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF55717C)
+                            color = SecondaryText
                         )
                     }
                     IconButton(onClick = {
                         editNameText = currentProfile.name
                         editingProfile = currentProfile
                     }) {
-                        Icon(Icons.Default.Edit, contentDescription = "重命名", tint = Color(0xFF006C5F))
+                        Icon(Icons.Default.Edit, contentDescription = "重命名", tint = AccentGreen)
                     }
                 }
             }
@@ -127,199 +163,279 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.WIFI,
                     onClick = { selectedTab = EnvironmentSimulationTab.WIFI },
-                    text = { Text("Wi-Fi (${currentProfile.wifiAps.size})") },
+                    text = { Text("Wi-Fi") },
                     icon = { Icon(Icons.Default.Wifi, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.CELLULAR,
                     onClick = { selectedTab = EnvironmentSimulationTab.CELLULAR },
-                    text = { Text("基站 (${currentProfile.cellTowers.size})") },
+                    text = { Text("基站") },
                     icon = { Icon(Icons.Default.CellTower, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTab == EnvironmentSimulationTab.SATELLITES,
+                    onClick = { selectedTab = EnvironmentSimulationTab.SATELLITES },
+                    text = { Text("卫星") },
+                    icon = { Icon(Icons.Default.Satellite, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.BLE,
                     onClick = { selectedTab = EnvironmentSimulationTab.BLE },
-                    text = { Text("蓝牙 (${currentProfile.bleBeacons.size})") },
+                    text = { Text("蓝牙") },
                     icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
                 )
                 Tab(
                     selected = selectedTab == EnvironmentSimulationTab.COLLECTION,
                     onClick = { selectedTab = EnvironmentSimulationTab.COLLECTION },
-                    text = { Text("全要素采集") },
+                    text = { Text("采集") },
                     icon = { Icon(Icons.Default.Download, contentDescription = null) }
                 )
             }
 
             when (selectedTab) {
                 EnvironmentSimulationTab.WIFI -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        items(currentProfile.wifiAps) { ap ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(ap.ssid, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text("BSSID: ${ap.bssid}  |  信号: ${ap.levelDbm} dBm  |  频段: ${ap.frequencyMhz} MHz", style = MaterialTheme.typography.bodySmall)
+                    if (currentProfile.wifiAps.isEmpty()) {
+                        EmptyEnvironmentHint("暂无 Wi-Fi 热点，请在“采集”页执行现场采集")
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                            items(currentProfile.wifiAps) { ap ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(ap.ssid, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            "BSSID: ${ap.bssid}  |  信号: ${ap.levelDbm} dBm  |  频段: ${ap.frequencyMhz} MHz",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
                 EnvironmentSimulationTab.CELLULAR -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        items(currentProfile.cellTowers) { tower ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("${tower.radioType} 基站 (MCC:${tower.mcc} MNC:${tower.mnc})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text("CI/CellID: ${tower.cidOrCi}  |  TAC/LAC: ${tower.lacOrTac}  |  PCI: ${tower.pci}", style = MaterialTheme.typography.bodySmall)
-                                    Text("RSRP/RSSI: ${tower.rssiDbm} dBm", style = MaterialTheme.typography.bodySmall, color = Color(0xFF006C5F))
+                    if (currentProfile.cellTowers.isEmpty()) {
+                        EmptyEnvironmentHint("暂无基站数据，请在“采集”页执行现场采集")
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                            items(currentProfile.cellTowers) { tower ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            "${tower.radioType} 基站 (MCC:${tower.mcc} MNC:${tower.mnc})",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "CI/CellID: ${tower.cidOrCi}  |  TAC/LAC: ${tower.lacOrTac}  |  PCI/PSC: ${tower.pci}",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "ARFCN: ${tower.arfcn}  |  信号: ${tower.rssiDbm} dBm",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = AccentGreen
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                EnvironmentSimulationTab.BLE -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        BleEmbeddedPanel(navController = navController)
+
+                EnvironmentSimulationTab.SATELLITES -> {
+                    if (currentProfile.satellites.isEmpty()) {
+                        EmptyEnvironmentHint("暂无卫星状态，请在室外或靠近窗户处执行现场采集")
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                            items(currentProfile.satellites) { satellite ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            "${constellationLabel(satellite.constellationType)} · SV ${satellite.svid}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "CN0: ${"%.1f".format(satellite.cn0DbHz)} dB-Hz  |  仰角: ${satellite.elevationDegrees.toInt()}°" +
+                                                "  |  方位: ${satellite.azimuthDegrees.toInt()}°",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            if (satellite.usedInFix) "参与定位解算" else "可见但未参与定位",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (satellite.usedInFix) AccentGreen else SecondaryText
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                EnvironmentSimulationTab.COLLECTION -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F6F5))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("一键全要素同步现场采样", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("同时采集此时的：真实经纬度坐标、周边 Wi-Fi 热点、4G/5G 基站、蓝牙信标以及可见与解算卫星信号状态，生成不可篡改的一体化环境快照 Profile。",
-                                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF55717C))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = {
-                                        val fineLoc = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                                        if (!fineLoc) {
-                                            Toast.makeText(context, "请先授予精准定位权限以采集现实环境全要素", Toast.LENGTH_SHORT).show()
-                                            return@Button
-                                        }
 
-                                        val wifiMgr = runCatching { context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager }.getOrNull()
-                                        val telephonyMgr = runCatching { context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager }.getOrNull()
-                                        val locMgr = runCatching { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }.getOrNull()
-
-                                        // 1. Location
-                                        val lastGps = runCatching { locMgr?.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
-                                        val lastNet = runCatching { locMgr?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
-                                        val curLoc = lastGps ?: lastNet
-
-                                        // 2. Wi-Fi
-                                        val realWifiResults: List<ScanResult> = runCatching { wifiMgr?.scanResults.orEmpty() }.getOrDefault(emptyList())
-                                        val capturedAps = realWifiResults.map { sr ->
-                                            VirtualWifiAp(
-                                                ssid = sr.SSID ?: "Hidden_SSID",
-                                                bssid = sr.BSSID ?: "00:00:00:00:00:00",
-                                                capabilities = sr.capabilities ?: "[WPA2-PSK-CCMP][ESS]",
-                                                levelDbm = sr.level,
-                                                frequencyMhz = sr.frequency
+                EnvironmentSimulationTab.BLE -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (currentProfile.bleBeacons.isNotEmpty()) {
+                            Text(
+                                "采集到的 BLE 信标 (${currentProfile.bleBeacons.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp)
+                            )
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 220.dp)
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                items(currentProfile.bleBeacons, key = { it.id }) { beacon ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                beacon.displayName,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                "MAC: ${beacon.virtualAddress}  |  RSSI: ${beacon.signal.baseRssi} dBm",
+                                                style = MaterialTheme.typography.bodySmall
                                             )
                                         }
+                                    }
+                                }
+                            }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            BleEmbeddedPanel(navController = navController)
+                        }
+                    }
+                }
 
-                                        // 3. Cellular
-                                        val realCellInfos: List<CellInfo> = runCatching { telephonyMgr?.allCellInfo.orEmpty() }.getOrDefault(emptyList())
-                                        val capturedTowers = realCellInfos.mapNotNull { ci ->
-                                            if (ci is CellInfoLte) {
-                                                VirtualCellTower(
-                                                    radioType = "LTE",
-                                                    mcc = runCatching { ci.cellIdentity.mccString?.toIntOrNull() ?: 460 }.getOrDefault(460),
-                                                    mnc = runCatching { ci.cellIdentity.mncString?.toIntOrNull() ?: 0 }.getOrDefault(0),
-                                                    lacOrTac = ci.cellIdentity.tac,
-                                                    cidOrCi = ci.cellIdentity.ci.toLong(),
-                                                    pci = ci.cellIdentity.pci,
-                                                    arfcn = ci.cellIdentity.earfcn,
-                                                    rssiDbm = ci.cellSignalStrength.rsrp
-                                                )
-                                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ci is CellInfoNr) {
-                                                val idNr = ci.cellIdentity as? android.telephony.CellIdentityNr
-                                                VirtualCellTower(
-                                                    radioType = "NR (5G)",
-                                                    mcc = runCatching { idNr?.mccString?.toIntOrNull() ?: 460 }.getOrDefault(460),
-                                                    mnc = runCatching { idNr?.mncString?.toIntOrNull() ?: 0 }.getOrDefault(0),
-                                                    lacOrTac = idNr?.tac ?: 4192,
-                                                    cidOrCi = idNr?.nci ?: 135792468L,
-                                                    pci = idNr?.pci ?: 100,
-                                                    arfcn = idNr?.nrarfcn ?: 1850,
-                                                    rssiDbm = runCatching { ci.cellSignalStrength.dbm }.getOrDefault(-80)
-                                                )
-                                            } else null
-                                        }
-
-                                        // 4. GNSS Satellites (Register short listener or sample cached)
-                                        val capturedSats = mutableListOf<VirtualSatellite>()
-                                        runCatching {
-                                            // Fallback realistic GNSS constellation if hardware raw isn't warm
-                                            val prnList = listOf(1, 2, 3, 6, 12, 14, 19, 21, 24, 28, 31, 32)
-                                            for ((idx, prn) in prnList.withIndex()) {
-                                                capturedSats.add(
-                                                    VirtualSatellite(
-                                                        svid = prn,
-                                                        constellationType = if (prn > 10) 5 else 1, // Beidou & GPS
-                                                        cn0DbHz = 30f + (idx % 12) * 1.5f,
-                                                        elevationDegrees = 20f + (idx * 5f),
-                                                        azimuthDegrees = (idx * 30f) % 360f,
-                                                        usedInFix = idx < 9
-                                                    )
+                EnvironmentSimulationTab.COLLECTION -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F6F5))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "一键全要素同步现场采样",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "同时采集真实经纬度、周边 Wi-Fi 热点、GSM/WCDMA/CDMA/LTE/5G 基站、" +
+                                            "BLE 信标以及 GNSS 卫星状态，生成可复查的环境快照。缺少权限、无线关闭或无信号时，" +
+                                            "对应项目会留空并给出提示，不会填充伪造样本。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = SecondaryText
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    val missingPermissions = collectionPermissions().filter {
+                                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                                    }
+                                    if (missingPermissions.isNotEmpty()) {
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color(0xFFFFF7EB)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFFB25E00), modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    "检测到部分权限未授予，点击下方按钮将自动请求系统授权并直接采集",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color(0xFF804300)
                                                 )
                                             }
                                         }
-
-                                        val newProfile = EnvironmentProfile(
-                                            name = "全要素快照-${System.currentTimeMillis() % 10000}",
-                                            latitude = curLoc?.latitude,
-                                            longitude = curLoc?.longitude,
-                                            altitude = curLoc?.altitude,
-                                            wifiAps = capturedAps,
-                                            cellTowers = capturedTowers,
-                                            satellites = capturedSats
+                                    }
+                                    Button(
+                                        onClick = {
+                                            val missing = collectionPermissions().filter {
+                                                ContextCompat.checkSelfPermission(context, it) !=
+                                                    PackageManager.PERMISSION_GRANTED
+                                            }
+                                            if (missing.isNotEmpty()) {
+                                                permissionLauncher.launch(missing.toTypedArray())
+                                            } else {
+                                                scope.launch { runCollection() }
+                                            }
+                                        },
+                                        enabled = !isCollecting,
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(if (isCollecting) "正在采集…" else "开始现场全要素同步采集")
+                                    }
+                                    if (isCollecting) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                    }
+                                    if (lastWarnings.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            "采集提示",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = SecondaryText
                                         )
-
-                                        scope.launch {
-                                            val updated = profiles.toMutableList().apply { add(newProfile) }
-                                            repository.saveEnvironmentProfiles(updated)
-                                            repository.saveActiveEnvironmentProfileId(newProfile.id)
-                                            // Also update map marker if location captured
-                                            if (curLoc != null) {
-                                                repository.saveLastClickedLocation(curLoc.latitude, curLoc.longitude)
-                                            }
+                                        lastWarnings.forEach { warning ->
+                                            Text(
+                                                "• $warning",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFF9A5B00)
+                                            )
                                         }
-
-                                        Toast.makeText(
-                                            context,
-                                            "成功固化全要素快照：${capturedAps.size} AP | ${capturedTowers.size} 基站 | ${capturedSats.size} 颗卫星！",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006C5F))
-                                ) {
-                                    Icon(Icons.Default.Download, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("开始现场全要素同步采集")
+                                    }
                                 }
                             }
                         }
 
-                        // Profiles List Management
-                        Text("已保存的环境快照列表 (${profiles.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+                        item {
+                            Text(
+                                "已保存的环境快照 (${profiles.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+
+                        if (profiles.isEmpty()) {
+                            item {
+                                Text(
+                                    "尚无环境快照，点击上方按钮开始采集。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SecondaryText
+                                )
+                            }
+                        } else {
                             items(profiles, key = { it.id }) { prof ->
                                 val isAct = prof.id == (activeId ?: currentProfile.id)
                                 Card(
@@ -337,11 +453,19 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(prof.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                prof.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                             val loc = if (prof.latitude != null && prof.longitude != null) {
                                                 "坐标: ${"%.4f".format(prof.latitude)}, ${"%.4f".format(prof.longitude)}"
                                             } else "坐标: 独立选点"
-                                            Text("$loc | AP: ${prof.wifiAps.size} | 基站: ${prof.cellTowers.size} | 卫星: ${prof.satellites.size}", style = MaterialTheme.typography.bodySmall)
+                                            Text(
+                                                "$loc | AP: ${prof.wifiAps.size} | BLE: ${prof.bleBeacons.size} | " +
+                                                    "基站: ${prof.cellTowers.size} | 卫星: ${prof.satellites.size}",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
                                         }
                                         Row {
                                             if (!isAct) {
@@ -354,22 +478,29 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                                     }
                                                     Toast.makeText(context, "已激活环境: ${prof.name}", Toast.LENGTH_SHORT).show()
                                                 }) {
-                                                    Text("应用", color = Color(0xFF006C5F))
+                                                    Text("应用", color = AccentGreen)
                                                 }
                                             }
                                             IconButton(onClick = {
                                                 editNameText = prof.name
                                                 editingProfile = prof
                                             }) {
-                                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color(0xFF55717C))
+                                                Icon(Icons.Default.Edit, contentDescription = "编辑", tint = SecondaryText)
                                             }
                                             IconButton(onClick = {
                                                 scope.launch {
                                                     val updated = profiles.filter { it.id != prof.id }
                                                     repository.saveEnvironmentProfiles(updated)
+                                                    if (activeId == prof.id) {
+                                                        repository.saveActiveEnvironmentProfileId(updated.lastOrNull()?.id)
+                                                    }
                                                 }
                                             }) {
-                                                Icon(Icons.Default.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "删除",
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
                                             }
                                         }
                                     }
@@ -399,7 +530,7 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                 Button(onClick = {
                     if (editNameText.isNotBlank()) {
                         scope.launch {
-                            val updated = profiles.map {
+                            val updated = repository.getEnvironmentProfiles().map {
                                 if (it.id == prof.id) it.copy(name = editNameText.trim()) else it
                             }
                             repository.saveEnvironmentProfiles(updated)
@@ -417,6 +548,28 @@ fun EnvironmentSimulationScreen(navController: NavController) {
             }
         )
     }
+}
+
+@Composable
+private fun EmptyEnvironmentHint(text: String) {
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = SecondaryText
+        )
+    }
+}
+
+private fun constellationLabel(type: Int): String = when (type) {
+    GnssStatus.CONSTELLATION_GPS -> "GPS"
+    GnssStatus.CONSTELLATION_SBAS -> "SBAS"
+    GnssStatus.CONSTELLATION_GLONASS -> "GLONASS"
+    GnssStatus.CONSTELLATION_QZSS -> "QZSS"
+    GnssStatus.CONSTELLATION_BEIDOU -> "北斗"
+    GnssStatus.CONSTELLATION_GALILEO -> "Galileo"
+    GnssStatus.CONSTELLATION_IRNSS -> "NavIC"
+    else -> "未知($type)"
 }
 
 @Composable

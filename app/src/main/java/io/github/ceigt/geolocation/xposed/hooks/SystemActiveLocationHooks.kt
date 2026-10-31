@@ -911,7 +911,8 @@ internal class SystemActiveLocationHooks(private val module: XposedInterface, pr
         return if (requested != null) {
             requested.takeIf { it in packages }
         } else {
-            selectSystemTargetPackage(packages, PreferencesUtil.snapshot().targetApps)
+            val config = PreferencesUtil.snapshot()
+            selectSystemTargetPackage(packages, config.targetApps, global = config.enableGlobalHooks)
         }
     }
 

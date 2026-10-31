@@ -1,6 +1,11 @@
 package io.github.ceigt.geolocation.manager.ui.route
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.github.ceigt.geolocation.data.model.route.RouteFavorite
 import io.github.ceigt.geolocation.data.model.route.RouteRunMode
@@ -36,6 +42,18 @@ fun RouteSimulationScreen(navController: NavController) {
 
     val favorites by repository.getRouteFavoritesFlow().collectAsState(initial = emptyList())
     var isRunning by remember { mutableStateOf(RouteSimulationService.engine.state.isActive) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+
+    fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -92,6 +110,7 @@ fun RouteSimulationScreen(navController: NavController) {
                                         waypoints = trackWps,
                                         runMode = RouteRunMode.AUTOMATIC
                                     )
+                                    checkNotificationPermission()
                                     RouteSimulationService.startService(context)
                                     isRunning = true
                                     Toast.makeText(context, "已启动 400 米标准环形跑道模拟巡航", Toast.LENGTH_SHORT).show()
@@ -144,6 +163,7 @@ fun RouteSimulationScreen(navController: NavController) {
                                                 loopMode = rf.loopMode,
                                                 runMode = RouteRunMode.AUTOMATIC
                                             )
+                                            checkNotificationPermission()
                                             RouteSimulationService.startService(context)
                                             isRunning = true
                                             Toast.makeText(context, "已启动路线: ${rf.name}", Toast.LENGTH_SHORT).show()

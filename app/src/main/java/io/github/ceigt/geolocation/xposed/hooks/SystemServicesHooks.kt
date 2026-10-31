@@ -23,7 +23,8 @@ import java.security.SecureRandom
 
 internal fun selectSystemTargetPackage(
     packages: Set<String>,
-    configuredTargets: Set<String>
+    configuredTargets: Set<String>,
+    global: Boolean = false
 ): String? {
     fun isThirdParty(packageName: String): Boolean =
         packageName != "android" &&
@@ -33,19 +34,29 @@ internal fun selectSystemTargetPackage(
             !packageName.startsWith("android.") &&
             !packageName.startsWith("com.android.")
 
+    val thirdParty = packages.filter(::isThirdParty)
+
+    if (global) {
+        // Global mode intentionally ignores the configured app list. Shared UIDs can expose
+        // several activities/packages; pick a stable third-party name for coordinate selection
+        // instead of refusing to spoof the whole Binder delivery.
+        return thirdParty.firstOrNull { it in configuredTargets } ?: thirdParty.minOrNull()
+    }
+
     // Explicit third-party entries win so their coordinate selection is honored. System-only
     // scope entries are bookkeeping and must never mask the actual receiving application.
-    val explicit = packages.filter { it in configuredTargets && isThirdParty(it) }
+    val explicit = thirdParty.filter { it in configuredTargets }
     if (explicit.size == 1) return explicit.single()
     if (explicit.size > 1) return null
-    return packages.filter(::isThirdParty).singleOrNull()
+    return thirdParty.singleOrNull()
 }
 
 internal fun selectVerifiedSystemTargetPackage(
-    uidPackages: Set<String>, requestedPackage: String?, configuredTargets: Set<String>
+    uidPackages: Set<String>, requestedPackage: String?, configuredTargets: Set<String>,
+    global: Boolean = false
 ): String? = if (requestedPackage != null && requestedPackage in uidPackages) {
-    selectSystemTargetPackage(setOf(requestedPackage), configuredTargets)
-} else selectSystemTargetPackage(uidPackages, configuredTargets)
+    selectSystemTargetPackage(setOf(requestedPackage), configuredTargets, global)
+} else selectSystemTargetPackage(uidPackages, configuredTargets, global)
 
 class SystemServicesHooks(
     private val module: XposedInterface,
@@ -133,8 +144,10 @@ class SystemServicesHooks(
             val uidPackages = context.packageManager.getPackagesForUid(uid)?.toSet().orEmpty()
             if (io.github.ceigt.geolocation.data.MANAGER_APP_PACKAGE_NAME in uidPackages) return@hookAll result
             // AOSP's callingPackage is argument 2; attributionTag is argument 3.
-            val targetPackage = selectVerifiedSystemTargetPackage(uidPackages, chain.args.getOrNull(2) as? String, config.targetApps)
-                ?: return@hookAll null
+            val targetPackage = selectVerifiedSystemTargetPackage(
+                uidPackages, chain.args.getOrNull(2) as? String, config.targetApps,
+                global = config.enableGlobalHooks
+            ) ?: return@hookAll null
             reportOnce("Replaced getLastLocation for $targetPackage")
             activeLocationHooks.singleLocation(service, uid, pid,
                 chain.args.firstOrNull() as? String ?: (result as? Location)?.provider.orEmpty(), targetPackage, result as? Location)
@@ -264,8 +277,9 @@ class SystemServicesHooks(
             addAll(collectPackageNames(chain.thisObject))
             chain.args.forEach { addAll(collectPackageNames(it)) }
         }
-        val targetPackage = selectSystemTargetPackage(receivingPackages, config.targetApps)
-            ?: return chain.proceed()
+        val targetPackage = selectSystemTargetPackage(
+            receivingPackages, config.targetApps, global = config.enableGlobalHooks
+        ) ?: return chain.proceed()
 
         val args = chain.args
         var replaced = false
@@ -520,7 +534,9 @@ class SystemServicesHooks(
         val config = PreferencesUtil.snapshot()
         if (!config.enableSystemHooks || !config.isPlaying) return null
         val packages = args.orEmpty().flatMap(::collectPackageNames).toSet()
-        return selectSystemTargetPackage(packages, config.targetApps)
+        return selectSystemTargetPackage(
+            packages, config.targetApps, global = config.enableGlobalHooks
+        )
     }
 
     private fun collectPackageNames(value: Any?): Set<String> {
