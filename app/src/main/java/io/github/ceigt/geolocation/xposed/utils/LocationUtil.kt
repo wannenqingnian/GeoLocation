@@ -145,11 +145,19 @@ object LocationUtil {
         }
 
         stripMockFlags(fakeLocation)
+        markSimulated(fakeLocation)
 
         return fakeLocation
     }
 
     private const val SYNTHETIC_SATELLITE_COUNT = 8
+    private val simulatedLocations = java.util.Collections.newSetFromMap(java.util.WeakHashMap<Location, Boolean>())
+
+    fun isSimulated(location: Location): Boolean = simulatedLocations.contains(location)
+
+    fun markSimulated(location: Location) {
+        simulatedLocations.add(location)
+    }
 
     /**
      * Strips mock flags across API 30~36:

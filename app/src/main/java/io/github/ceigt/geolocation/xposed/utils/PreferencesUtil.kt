@@ -215,17 +215,16 @@ object PreferencesUtil {
             return
         }
 
-        val mockProviderEnabled = prefs.getBoolean(
-            KEY_ENABLE_MOCK_PROVIDER,
-            DEFAULT_ENABLE_MOCK_PROVIDER
-        )
         val point = parseLastClickedLocation(prefs.getString(KEY_LAST_CLICKED_LOCATION, null))
+        val currentMode = LocationMode.fromStored(prefs.getString(KEY_LOCATION_MODE, DEFAULT_LOCATION_MODE))
+        val rawPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
+        val mockProviderActive = (currentMode == LocationMode.MOCK_PROVIDER || prefs.getBoolean(KEY_ENABLE_MOCK_PROVIDER, DEFAULT_ENABLE_MOCK_PROVIDER)) && currentMode != LocationMode.APPLICATION_HOOK && currentMode != LocationMode.SYSTEM_HOOK && currentMode != LocationMode.GLOBAL_HOOK
+
         val previousMode = cache.isPlaying && cache.enableSystemHooks
         cache = PreferencesSnapshot(
-            // Mock Provider and Xposed replacement are mutually exclusive location sources.
-            // Keeping installed interceptors inert also makes mode changes take effect without
-            // restarting target apps that already have this module loaded.
-            isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false) && !mockProviderEnabled && point != null,
+            // If in Application/System/Global hook mode, Xposed replacement is active.
+            // If strictly in standalone Mock Provider mode, Xposed interceptors remain inert.
+            isPlaying = rawPlaying && !mockProviderActive && point != null,
             lastClickedLocation = point,
             useAccuracy = prefs.getBoolean(KEY_USE_ACCURACY, DEFAULT_USE_ACCURACY),
             accuracy = readDouble(prefs, KEY_ACCURACY, DEFAULT_ACCURACY),
@@ -284,7 +283,7 @@ object PreferencesUtil {
         if (previousMode != (cache.isPlaying && cache.enableSystemHooks)) {
             modeListeners.forEach { listener -> runCatching { listener() } }
         }
-        val diagnostic = "hookActive=${cache.isPlaying}, mockProvider=$mockProviderEnabled, " +
+        val diagnostic = "hookActive=${cache.isPlaying}, mockProvider=$mockProviderActive, " +
             "hasPoint=${cache.lastClickedLocation != null}, systemHooks=${cache.enableSystemHooks}"
         if (diagnostic != lastDiagnostic) {
             lastDiagnostic = diagnostic
