@@ -190,6 +190,8 @@ internal class TencentLocationHooks(
                 put("getTime", System.currentTimeMillis())
                 put("getCoordinateType", if (coordinateSystem == CoordinateSystem.WGS84) TENCENT_COORDINATE_WGS84 else TENCENT_COORDINATE_GCJ02)
                 put("isMockGps", 0)
+                put("getProvider", "gps")
+                put("getPoiList", emptyList<Any>())
                 if (config.useAltitude) put("getAltitude", LocationUtil.altitude)
                 if (config.useAccuracy) put("getAccuracy", LocationUtil.accuracy)
                 if (config.useSpeed) put("getSpeed", LocationUtil.speed)

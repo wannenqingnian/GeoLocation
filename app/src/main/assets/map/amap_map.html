@@ -76,6 +76,10 @@
     api.src='https://webapi.amap.com/maps?v=2.0&key=__AMAP_WEB_KEY__&plugin=AMap.PlaceSearch,AMap.Geocoder&callback=initAmapTraceMap';
     api.onerror=()=>callAndroid('onMapError');
     document.head.appendChild(api);
+
+    const trackEditor=document.createElement('script');
+    trackEditor.src='track_editor.js';
+    document.head.appendChild(trackEditor);
 })();
 </script>
 </body>

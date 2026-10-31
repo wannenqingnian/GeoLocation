@@ -258,6 +258,9 @@ fun TargetAppsScreen(
                                     onRelaunch = { viewModel.relaunchApp(app.packageName) },
                                     onCoordinateSystemChange = {
                                         viewModel.cycleCoordinateSystem(app.packageName)
+                                    },
+                                    onHookInstallPolicyChange = {
+                                        viewModel.cycleHookInstallPolicy(app.packageName)
                                     }
                                 )
                                 HorizontalDivider(
@@ -401,6 +404,9 @@ fun TargetAppsBottomSheet(
                                     onRelaunch = { viewModel.relaunchApp(app.packageName) },
                                     onCoordinateSystemChange = {
                                         viewModel.cycleCoordinateSystem(app.packageName)
+                                    },
+                                    onHookInstallPolicyChange = {
+                                        viewModel.cycleHookInstallPolicy(app.packageName)
                                     }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = Color(0x12617470))
@@ -424,7 +430,8 @@ private fun TargetAppRow(
     app: TargetAppItem,
     onToggle: () -> Unit,
     onRelaunch: () -> Unit,
-    onCoordinateSystemChange: () -> Unit
+    onCoordinateSystemChange: () -> Unit,
+    onHookInstallPolicyChange: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -468,17 +475,32 @@ private fun TargetAppRow(
                 // Coordinate overrides also apply to system callbacks for unscoped apps.
                 // Editing an override must not require changing the LSPosed scope.
                 if (!app.isScopeOnly) {
-                    Text(
-                        text = stringResource(
-                            R.string.target_apps_coordinate_system,
-                            app.coordinateSystem.name
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF006C5F),
-                        modifier = Modifier
-                            .padding(top = 3.dp)
-                            .clickable(onClick = onCoordinateSystemChange)
-                    )
+                    Row(
+                        modifier = Modifier.padding(top = 3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.target_apps_coordinate_system,
+                                app.coordinateSystem.name
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF006C5F),
+                            modifier = Modifier.clickable(onClick = onCoordinateSystemChange)
+                        )
+                        val policyLabel = when (app.hookInstallPolicy) {
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.IMMEDIATE -> "立即挂载"
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.DYNAMIC_CLASSLOAD -> "动态类加载"
+                            io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy.APPLICATION_CREATE -> "App启动补装"
+                        }
+                        Text(
+                            text = "挂载: $policyLabel",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.clickable(onClick = onHookInstallPolicyChange)
+                        )
+                    }
                 }
             }
 

@@ -223,6 +223,10 @@
         api.src = 'https://api.map.baidu.com/api?v=3.0&ak=__BAIDU_WEB_AK__&callback=initBaiduTraceMap';
         api.onerror = () => callAndroid('onMapError');
         document.head.appendChild(api);
+
+        const trackEditor = document.createElement('script');
+        trackEditor.src = 'track_editor.js';
+        document.head.appendChild(trackEditor);
     })();
 </script>
 </body>

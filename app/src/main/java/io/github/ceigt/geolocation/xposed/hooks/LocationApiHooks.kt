@@ -16,12 +16,23 @@ class LocationApiHooks(
 ) {
     private val tag = "[LocationApiHooks]"
     private val tencent = TencentLocationHooks(module, classLoader)
+    private val amap = AmapLocationSdkHooks(module, classLoader)
+    private val baidu = BaiduLocationSdkHooks(module, classLoader)
+    private val fused = FusedLocationProviderHooks(module, classLoader)
+    private val cadence = AccelerometerCadenceHooks(module, classLoader)
+    private val locationMode = SettingsSecureLocationModeHooker(module, classLoader)
 
     fun initHooks() {
         initialize("Location manager") { LocationManagerHooks(module, classLoader).initHooks() }
+        initialize("Location mode & switches") { locationMode.initHooks() }
         initialize("Active callbacks") { ActiveLocationHooks(module).initHooks() }
         initialize("Callback results") { LocationCallbackHooks(module, classLoader).initHooks() }
+        initialize("GNSS Status") { GnssStatusHooks(module, classLoader).initHooks() }
+        initialize("Accelerometer & Cadence") { cadence.initHooks() }
         initialize("Tencent SDK") { tencent.initHooks() }
+        initialize("AMap SDK") { amap.initHooks() }
+        initialize("Baidu SDK") { baidu.initHooks() }
+        initialize("Fused Providers (GMS/HMS)") { fused.initHooks() }
         // Keep Wi-Fi scans, cell information and GNSS callback registration available. Tencent,
         // AMap and other vendor location SDKs use those sources to establish a fix before they
         // emit an Android Location. Clearing the sources here can suppress location callbacks
@@ -32,6 +43,10 @@ class LocationApiHooks(
     fun onApplicationReady(context: android.content.Context) {
         ApplicationLocationAccess.init(context)
         initialize("Tencent SDK retry") { tencent.initHooks(context.classLoader) }
+        initialize("AMap SDK retry") { amap.initHooks(context.classLoader) }
+        initialize("Baidu SDK retry") { baidu.initHooks(context.classLoader) }
+        initialize("Fused Providers retry") { fused.initHooks(context.classLoader) }
+        initialize("Accelerometer retry") { cadence.initHooks(context.classLoader) }
     }
 
     private inline fun initialize(name: String, action: () -> Unit) {

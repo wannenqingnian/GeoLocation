@@ -508,17 +508,29 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         reverseGeocodeJob?.cancel()
 
         val displayAddress = address?.trim()?.takeIf(String::isNotEmpty)
+        val displayPoi = poiTitle?.trim()?.takeIf(String::isNotEmpty)
         _uiState.update {
             it.copy(
                 isSelectedLocationAddressLoading = false,
                 selectedLocationAddress = displayAddress,
-                selectedLocationPoiTitle = poiTitle?.trim()?.takeIf(String::isNotEmpty),
+                selectedLocationPoiTitle = displayPoi,
                 selectedLocationAddressMessageRes = if (displayAddress == null) {
                     R.string.map_status_address_unavailable
                 } else {
                     null
                 }
             )
+        }
+
+        // Automatically persist structured address metadata for SDK hooks
+        if (displayAddress != null) {
+            writer.enqueue {
+                val metadata = io.github.ceigt.geolocation.data.model.channel.LocationAddressMetadata(
+                    formattedAddress = displayAddress,
+                    poiName = displayPoi ?: displayAddress
+                )
+                preferencesRepository.saveLocationAddressMetadata(metadata)
+            }
         }
     }
 

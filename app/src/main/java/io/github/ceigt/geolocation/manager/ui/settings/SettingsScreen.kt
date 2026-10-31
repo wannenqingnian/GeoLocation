@@ -83,6 +83,9 @@ import androidx.navigation.NavController
 import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.MapProvider
 import io.github.ceigt.geolocation.data.OsmTileServer
+import io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy
+import io.github.ceigt.geolocation.data.model.mode.LocationMode
+import io.github.ceigt.geolocation.data.model.mode.MockFlagPolicy
 import io.github.ceigt.geolocation.manager.control.ControlReceiver
 import io.github.ceigt.geolocation.manager.localization.LanguageOption
 import io.github.ceigt.geolocation.manager.localization.LocaleController
@@ -283,6 +286,8 @@ fun SettingsScreen(
                     targetAppScopeRequired = true
                 is SystemHooksEvent.ScopeSetupRequired ->
                     missingSystemScopePackages = event.missingPackages
+                is SystemHooksEvent.RootPermissionRequired ->
+                    snackbarHostState.showSnackbar(context.getString(R.string.target_apps_root_required))
             }
         }
     }
@@ -565,6 +570,8 @@ fun SettingsBottomSheet(
                     targetAppScopeRequired = true
                 is SystemHooksEvent.ScopeSetupRequired ->
                     missingSystemScopePackages = event.missingPackages
+                is SystemHooksEvent.RootPermissionRequired ->
+                    snackbarHostState.showSnackbar(context.getString(R.string.target_apps_root_required))
             }
         }
     }

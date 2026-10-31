@@ -550,6 +550,22 @@ private class WebMapBridge(private val callbacks: WebMapCallbacks) {
     }
 
     @JavascriptInterface
+    fun onTrackEditorEvent(payload: String) = post {
+        android.util.Log.i("GeoLocationMap", "Track editor event: $payload")
+        runCatching {
+            val json = JSONObject(payload)
+            val type = json.optString("type")
+            if (type == "start" || type == "move") {
+                val lat = json.optDouble("latitude", Double.NaN)
+                val lon = json.optDouble("longitude", Double.NaN)
+                if (lat.isFinite() && lon.isFinite() && lat in -90.0..90.0 && lon in -180.0..180.0) {
+                    callbacks.onMapClicked(lat, lon)
+                }
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun onSearchResults(query: String, payload: String, success: Boolean) {
         if (query.length > 1_000 || payload.length > MAX_BRIDGE_PAYLOAD_CHARS) {
             post { callbacks.onSearchResults(query.take(1_000), "[]", false) }

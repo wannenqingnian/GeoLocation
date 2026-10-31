@@ -10,7 +10,18 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
@@ -31,6 +42,7 @@
             android:name=".manager.MainActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
+            android:supportsPictureInPicture="true"
             android:theme="@style/Theme.GeoLocation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -42,6 +54,25 @@
             android:name=".manager.mock.MockLocationService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <service
+            android:name=".manager.root.RootLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <service
+            android:name=".manager.route.RouteSimulationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <service
+            android:name=".manager.ble.BlePeripheralService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver
+            android:name=".manager.route.RoutePictureInPictureActionReceiver"
+            android:exported="false" />
 
         <!--
             Off by default. The user opts in via Settings → External Control,

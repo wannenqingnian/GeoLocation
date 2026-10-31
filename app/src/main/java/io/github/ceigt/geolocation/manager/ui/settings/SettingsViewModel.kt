@@ -5,6 +5,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.ceigt.geolocation.data.*
+import io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy
+import io.github.ceigt.geolocation.data.model.mode.LocationMode
+import io.github.ceigt.geolocation.data.model.mode.MockFlagPolicy
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
 import io.github.ceigt.geolocation.manager.App
 import kotlinx.coroutines.flow.*
@@ -15,21 +18,7 @@ sealed interface SystemHooksEvent {
     data object ModuleNotActive : SystemHooksEvent
     data object TargetAppScopeRequired : SystemHooksEvent
     data class ScopeSetupRequired(val missingPackages: List<String>) : SystemHooksEvent
-}
-
-enum class LocationMode {
-    APPLICATION_HOOK,
-    SYSTEM_HOOK,
-    MOCK_PROVIDER
-}
-
-internal fun resolveLocationMode(
-    mockProviderEnabled: Boolean,
-    systemHooksEnabled: Boolean
-): LocationMode = when {
-    mockProviderEnabled -> LocationMode.MOCK_PROVIDER
-    systemHooksEnabled -> LocationMode.SYSTEM_HOOK
-    else -> LocationMode.APPLICATION_HOOK
+    data object RootPermissionRequired : SystemHooksEvent
 }
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -225,12 +214,58 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val enableSystemHooks: StateFlow<Boolean> = preferencesRepository.getEnableSystemHooksFlow()
         .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_ENABLE_SYSTEM_HOOKS)
 
-    val locationMode: StateFlow<LocationMode> = combine(
-        enableMockProvider,
-        enableSystemHooks
-    ) { mockProviderEnabled, systemHooksEnabled ->
-        resolveLocationMode(mockProviderEnabled, systemHooksEnabled)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, LocationMode.APPLICATION_HOOK)
+    val locationMode: StateFlow<LocationMode> = preferencesRepository.getLocationModeFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, LocationMode.APPLICATION_HOOK)
+
+    val mockFlagPolicy: StateFlow<MockFlagPolicy> = preferencesRepository.getMockFlagPolicyFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, MockFlagPolicy.HIDE_ALL)
+
+    val hookInstallPolicy: StateFlow<HookInstallPolicy> = preferencesRepository.getHookInstallPolicyFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HookInstallPolicy.IMMEDIATE)
+
+    val appHookInstallPolicies: StateFlow<Map<String, HookInstallPolicy>> = preferencesRepository.getAppHookInstallPoliciesFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val gnssConstellationPreset: StateFlow<io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset> =
+        preferencesRepository.getGnssConstellationPresetFlow()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED)
+
+    val gnssSignalStrengthPreset: StateFlow<io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset> =
+        preferencesRepository.getGnssSignalStrengthPresetFlow()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL)
+
+    val gnssVisibleSatellites: StateFlow<Int> = preferencesRepository.getGnssVisibleSatellitesFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_VISIBLE_SATELLITES)
+
+    val gnssUsedSatellites: StateFlow<Int> = preferencesRepository.getGnssUsedSatellitesFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_USED_SATELLITES)
+
+    val gnssJitterEnabled: StateFlow<Boolean> = preferencesRepository.getGnssJitterEnabledFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_JITTER_ENABLED)
+
+    val gnssJitterAlgorithm: StateFlow<io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm> =
+        preferencesRepository.getGnssJitterAlgorithmFlow()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV)
+
+    val gnssJitterRadius: StateFlow<Double> = preferencesRepository.getGnssJitterRadiusFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_JITTER_RADIUS)
+
+    val gnssJitterSmoothing: StateFlow<Double> = preferencesRepository.getGnssJitterSmoothingFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_JITTER_SMOOTHING)
+
+    val gnssJitterDriftSpeed: StateFlow<Double> = preferencesRepository.getGnssJitterDriftSpeedFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GNSS_JITTER_DRIFT_SPEED)
+
+    val globalCadenceMode: StateFlow<io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode> =
+        preferencesRepository.getGlobalCadenceModeFlow()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO)
+
+    val globalCadenceChannel: StateFlow<io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel> =
+        preferencesRepository.getGlobalCadenceChannelFlow()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.ACCELEROMETER)
+
+    val globalCustomSpm: StateFlow<Int> = preferencesRepository.getGlobalCustomSpmFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_GLOBAL_CUSTOM_SPM)
 
     private val _systemHooksEvents = MutableSharedFlow<SystemHooksEvent>(extraBufferCapacity = 1)
     val systemHooksEvents: SharedFlow<SystemHooksEvent> = _systemHooksEvents.asSharedFlow()
@@ -313,16 +348,99 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAmapSecurityCode(value: String) = _amapSecurityCodePreference.setValue(value.trim())
     fun setGoogleMapsApiKey(value: String) = _googleMapsApiKeyPreference.setValue(value.trim())
 
+    fun setMockFlagPolicy(policy: MockFlagPolicy) = enqueueSave {
+        preferencesRepository.saveMockFlagPolicy(policy)
+    }
+
+    fun setHookInstallPolicy(policy: HookInstallPolicy) = enqueueSave {
+        preferencesRepository.saveHookInstallPolicy(policy)
+    }
+
+    fun setAppHookInstallPolicy(packageName: String, policy: HookInstallPolicy) = enqueueSave {
+        preferencesRepository.saveAppHookInstallPolicy(packageName, policy)
+    }
+
+    fun setGnssConstellationPreset(preset: io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset) = enqueueSave {
+        preferencesRepository.saveGnssConstellationPreset(preset)
+    }
+
+    fun setGnssSignalStrengthPreset(preset: io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset) = enqueueSave {
+        preferencesRepository.saveGnssSignalStrengthPreset(preset)
+    }
+
+    fun setGnssVisibleSatellites(count: Int) = enqueueSave {
+        preferencesRepository.saveGnssVisibleSatellites(count)
+    }
+
+    fun setGnssUsedSatellites(count: Int) = enqueueSave {
+        preferencesRepository.saveGnssUsedSatellites(count)
+    }
+
+    fun setGnssJitterEnabled(enabled: Boolean) = enqueueSave {
+        preferencesRepository.saveGnssJitterEnabled(enabled)
+    }
+
+    fun setGnssJitterAlgorithm(algo: io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm) = enqueueSave {
+        preferencesRepository.saveGnssJitterAlgorithm(algo)
+    }
+
+    fun setGnssJitterRadius(radius: Double) = enqueueSave {
+        preferencesRepository.saveGnssJitterRadius(radius)
+    }
+
+    fun setGnssJitterSmoothing(smoothing: Double) = enqueueSave {
+        preferencesRepository.saveGnssJitterSmoothing(smoothing)
+    }
+
+    fun setGnssJitterDriftSpeed(speed: Double) = enqueueSave {
+        preferencesRepository.saveGnssJitterDriftSpeed(speed)
+    }
+
+    fun setGlobalCadenceMode(mode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode) = enqueueSave {
+        preferencesRepository.saveGlobalCadenceMode(mode)
+    }
+
+    fun setGlobalCadenceChannel(channel: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel) = enqueueSave {
+        preferencesRepository.saveGlobalCadenceChannel(channel)
+    }
+
+    fun setGlobalCustomSpm(spm: Int) = enqueueSave {
+        preferencesRepository.saveGlobalCustomSpm(spm)
+    }
+
     private val modeSelection = LatestSelection<LocationMode>(
         ::enqueueSave,
-        { mode -> mode != LocationMode.SYSTEM_HOOK || validateSystemScope() },
-        { mode -> preferencesRepository.saveLocationMode(
-            mockProvider = mode == LocationMode.MOCK_PROVIDER,
-            systemHooks = mode == LocationMode.SYSTEM_HOOK
-        ) }
+        { mode ->
+            when (mode) {
+                LocationMode.SYSTEM_HOOK, LocationMode.GLOBAL_HOOK -> validateSystemScope()
+                LocationMode.ROOT_MODE -> validateRootAccess()
+                LocationMode.APPLICATION_HOOK -> validateAppHookAccess()
+                LocationMode.MOCK_PROVIDER -> true
+            }
+        },
+        { mode -> preferencesRepository.saveLocationMode(mode) }
     )
 
     fun selectLocationMode(mode: LocationMode) = modeSelection.select(mode)
+
+    private fun validateRootAccess(): Boolean {
+        val hasRoot = io.github.ceigt.geolocation.manager.control.RootCommands.hasRoot()
+        if (!hasRoot) {
+            _systemHooksEvents.tryEmit(SystemHooksEvent.RootPermissionRequired)
+            return false
+        }
+        return true
+    }
+
+    private fun validateAppHookAccess(): Boolean {
+        // App-level hook requires LSPosed module to be active
+        if (App.service == null) {
+            _systemHooksEvents.tryEmit(SystemHooksEvent.ModuleNotActive)
+            // Allow user to select mode so settings can be mirrored when module activates
+            return true
+        }
+        return true
+    }
 
     private fun validateSystemScope(): Boolean {
         if (!SystemHookSupport.supports(android.os.Build.VERSION.SDK_INT)) {

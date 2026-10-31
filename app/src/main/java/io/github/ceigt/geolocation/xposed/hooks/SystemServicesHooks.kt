@@ -721,6 +721,28 @@ class SystemServicesHooks(
 
             val copy = copyLocationPayload(result)
             if (copy != null && copy !== result && replaceLocationFields(copy, targetPackage)) return copy
+
+            // Check if result contains mLocation or mLocations directly
+            if (replaceLocationFields(result, targetPackage)) {
+                return result
+            }
+
+            // Check if result is a custom container with size() and get(int)
+            runCatching {
+                val sizeMethod = findMethod(result.javaClass, "size")
+                val getMethod = findMethod(result.javaClass, "get", Int::class.javaPrimitiveType ?: Integer.TYPE)
+                if (sizeMethod != null && getMethod != null) {
+                    val size = sizeMethod.invoke(result) as? Int ?: 0
+                    for (i in 0 until size) {
+                        val elem = getMethod.invoke(result, i)
+                        if (elem is Location) {
+                            elem.set(LocationUtil.createFakeLocation(elem, targetPackage = targetPackage))
+                        }
+                    }
+                    return result
+                }
+            }
+
             reportOnce("Unsupported MIUI location container suppressed: ${result.javaClass.name}")
             return null
         }

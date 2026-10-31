@@ -11,6 +11,7 @@ import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.CoordinateSystem
 import io.github.ceigt.geolocation.data.MANAGER_APP_PACKAGE_NAME
 import io.github.ceigt.geolocation.data.applicationHookTargets
+import io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
 import io.github.ceigt.geolocation.manager.App
 import io.github.ceigt.geolocation.manager.control.RootCommands
@@ -38,7 +39,8 @@ data class TargetAppItem(
     val isSelected: Boolean = false,
     val isPending: Boolean = false,
     val isRelaunching: Boolean = false,
-    val coordinateSystem: CoordinateSystem = CoordinateSystem.WGS84
+    val coordinateSystem: CoordinateSystem = CoordinateSystem.WGS84,
+    val hookInstallPolicy: HookInstallPolicy = HookInstallPolicy.IMMEDIATE
 )
 
 data class TargetAppsUiState(
@@ -47,6 +49,7 @@ data class TargetAppsUiState(
     val pendingPackages: Set<String> = emptySet(),
     val relaunchingPackages: Set<String> = emptySet(),
     val appCoordinateSystems: Map<String, CoordinateSystem> = emptyMap(),
+    val appHookInstallPolicies: Map<String, HookInstallPolicy> = emptyMap(),
     val searchQuery: String = "",
     val showSystemApps: Boolean = false,
     val isLoading: Boolean = true,
@@ -120,6 +123,7 @@ class TargetAppsViewModel(application: Application) : AndroidViewModel(applicati
         observeService()
         observeSystemAppVisibility()
         observeCoordinateSystems()
+        observeHookInstallPolicies()
     }
 
     fun updateSearchQuery(query: String) {
@@ -134,6 +138,35 @@ class TargetAppsViewModel(application: Application) : AndroidViewModel(applicati
         writer.enqueue {
             val current = preferencesRepository.getAppCoordinateSystems()[packageName] ?: CoordinateSystem.WGS84
             preferencesRepository.saveAppCoordinateSystem(packageName, current.next())
+        }
+    }
+
+    fun cycleHookInstallPolicy(packageName: String) {
+        writer.enqueue {
+            val current = preferencesRepository.getAppHookInstallPoliciesFlow()
+            val map = _uiState.value.appHookInstallPolicies
+            val policy = map[packageName] ?: HookInstallPolicy.IMMEDIATE
+            val nextPolicy = when (policy) {
+                HookInstallPolicy.IMMEDIATE -> HookInstallPolicy.DYNAMIC_CLASSLOAD
+                HookInstallPolicy.DYNAMIC_CLASSLOAD -> HookInstallPolicy.APPLICATION_CREATE
+                HookInstallPolicy.APPLICATION_CREATE -> HookInstallPolicy.IMMEDIATE
+            }
+            preferencesRepository.saveAppHookInstallPolicy(packageName, nextPolicy)
+        }
+    }
+
+    private fun observeHookInstallPolicies() {
+        viewModelScope.launch {
+            preferencesRepository.getAppHookInstallPoliciesFlow().collectLatest { policies ->
+                _uiState.update { state ->
+                    state.copy(
+                        appHookInstallPolicies = policies,
+                        apps = state.apps.map { app ->
+                            app.copy(hookInstallPolicy = policies[app.packageName] ?: HookInstallPolicy.IMMEDIATE)
+                        }
+                    )
+                }
+            }
         }
     }
 

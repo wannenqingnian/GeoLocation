@@ -51,6 +51,8 @@ object LocationUtil {
     private var randomizedRadius: Double = Double.NaN
     private var randomizedPoint: Pair<Double, Double>? = null
 
+    private val frameAssembler = io.github.ceigt.geolocation.simulation.frame.LocationFrameAssembler()
+
     @Volatile var latitude: Double = 0.0
     @Volatile var longitude: Double = 0.0
     @Volatile var accuracy: Float = 0F
@@ -142,26 +144,70 @@ object LocationUtil {
             putInt("satellites", SYNTHETIC_SATELLITE_COUNT)
         }
 
-        attemptHideMockProvider(fakeLocation)
+        stripMockFlags(fakeLocation)
 
         return fakeLocation
     }
 
     private const val SYNTHETIC_SATELLITE_COUNT = 8
 
-    private fun attemptHideMockProvider(fakeLocation: Location) {
-        if (!canAttemptMockProviderHide) return
-        try {
-            HiddenApiBypass.invoke(fakeLocation.javaClass, fakeLocation, "setIsFromMockProvider", false)
-            if (DEBUG) {
-                log("invoked hidden API - setIsFromMockProvider: false)")
+    /**
+     * Strips mock flags across API 30~36:
+     * - Android 12+ (SDK_INT >= 31): Location.setMock(false) via reflection or direct call
+     * - Location.setIsFromMockProvider(false) via reflection
+     * - Android 12+ (SDK_INT >= 31): Location.mFieldsMask (Int), mask and -17 (clears bit 4 HAS_MOCK_PROVIDER_MASK = 0x10)
+     */
+    fun stripMockFlags(location: Location) {
+        val policy = PreferencesUtil.getMockFlagPolicy()
+        if (policy == io.github.ceigt.geolocation.data.model.mode.MockFlagPolicy.PRESERVE) return
+
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Location.setMock(false)
+                try {
+                    val setMockMethod = location.javaClass.getMethod("setMock", Boolean::class.javaPrimitiveType)
+                    setMockMethod.isAccessible = true
+                    setMockMethod.invoke(location, false)
+                } catch (t: Throwable) {
+                    try {
+                        HiddenApiBypass.invoke(location.javaClass, location, "setMock", false)
+                    } catch (_: Throwable) {}
+                }
             }
-        } catch (e: Exception) {
-            // A missing/blocked hidden API will fail the same way for every Location instance.
-            // Circuit-break after the first failure instead of paying exception cost per update.
-            canAttemptMockProviderHide = false
-            log("Not possible to hide mock provider - ${e.message}", priority = Log.ERROR)
         }
+
+        runCatching {
+            try {
+                val setIsFromMockMethod = location.javaClass.getMethod("setIsFromMockProvider", Boolean::class.javaPrimitiveType)
+                setIsFromMockMethod.isAccessible = true
+                setIsFromMockMethod.invoke(location, false)
+            } catch (t: Throwable) {
+                try {
+                    HiddenApiBypass.invoke(location.javaClass, location, "setIsFromMockProvider", false)
+                } catch (_: Throwable) {}
+            }
+        }
+
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val maskField = try {
+                    location.javaClass.getDeclaredField("mFieldsMask").apply { isAccessible = true }
+                } catch (t: Throwable) {
+                    HiddenApiBypass.getInstanceFields(location.javaClass)
+                        .firstOrNull { (it as? java.lang.reflect.Field)?.name == "mFieldsMask" } as? java.lang.reflect.Field
+                }
+                maskField?.let { field ->
+                    field.isAccessible = true
+                    val mask = field.getInt(location)
+                    // Clear bit 4 (HAS_MOCK_PROVIDER_MASK = 0x10 = 16), mask and -17 (which is inv(16))
+                    field.setInt(location, mask and -17)
+                }
+            }
+        }
+    }
+
+    private fun attemptHideMockProvider(fakeLocation: Location) {
+        stripMockFlags(fakeLocation)
     }
 
     fun updateLocation(
@@ -192,7 +238,24 @@ object LocationUtil {
                     )
                     CoordinateSystem.BD09 -> CoordinateTransform.wgs84ToBd09(storedPoint)
                 }
-                if (config.useRandomize) {
+                if (config.gnssJitterEnabled) {
+                    val jitterSettings = io.github.ceigt.geolocation.data.model.gnss.GnssJitterCustomSettings(
+                        enabled = true,
+                        algorithm = config.gnssJitterAlgorithm,
+                        radiusMeters = config.gnssJitterRadius,
+                        smoothingRatio = config.gnssJitterSmoothing,
+                        driftSpeedMetersPerSecond = config.gnssJitterDriftSpeed
+                    )
+                    val accuracySettings = io.github.ceigt.geolocation.data.model.gnss.GnssAccuracyCustomSettings(
+                        horizontalMeters = if (config.useAccuracy) config.accuracy.toFloat() else DEFAULT_ACCURACY.toFloat()
+                    )
+                    frameAssembler.updateSettings(jitterSettings, accuracySettings)
+                    val (jitLat, jitLon, accPair) = frameAssembler.applyJitter(outputPoint.latitude, outputPoint.longitude)
+                    latitude = jitLat
+                    longitude = jitLon
+                    accuracy = accPair.first
+                    verticalAccuracy = accPair.second
+                } else if (config.useRandomize) {
                     val randomLocation = getStableRandomLocation(
                         outputPoint.latitude,
                         outputPoint.longitude,
@@ -335,4 +398,19 @@ object LocationUtil {
 
     private const val RANDOMIZATION_INTERVAL_NANOS = 1_000_000_000L
     private const val FALLBACK_ACCURACY_METERS = 5F
+
+    /**
+     * Compute step cadence SPM (steps per minute) strictly based on movement speed
+     */
+    fun computeCadenceStepsPerMinute(speedMetersPerSec: Float, enabled: Boolean, customSpm: Int?): Int {
+        if (!enabled || speedMetersPerSec < 0.2f) return 0
+        if (customSpm != null && customSpm > 0) return customSpm
+        return if (speedMetersPerSec < 2.2f) {
+            // Walking / slow walking
+            kotlin.math.round((speedMetersPerSec * 32.0f + 80.0f)).toInt().coerceIn(90, 150)
+        } else {
+            // Running
+            kotlin.math.round((speedMetersPerSec * 8.0f + 150.0f)).toInt().coerceIn(150, 200)
+        }
+    }
 }

@@ -6,6 +6,7 @@ import android.widget.Toast
 import io.github.ceigt.geolocation.data.REMOTE_PREFS_GROUP
 import io.github.ceigt.geolocation.data.MANAGER_APP_PACKAGE_NAME
 import io.github.ceigt.geolocation.data.SystemHookSupport
+import io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy
 import android.os.Build
 import io.github.ceigt.geolocation.xposed.hooks.isolateHook
 import io.github.ceigt.geolocation.xposed.hooks.LocationApiHooks
@@ -18,6 +19,8 @@ import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
+import java.util.Collections
+import java.util.WeakHashMap
 
 class ModuleEntry : XposedModule() {
     companion object {
@@ -28,6 +31,10 @@ class ModuleEntry : XposedModule() {
     private var locationApiHooks: LocationApiHooks? = null
     private var systemServicesHooks: SystemServicesHooks? = null
     private var isSystemServer = false
+
+    // Record hooked ClassLoaders to prevent duplicate attachment under dynamic class loading
+    private val hookedClassLoaders: MutableSet<ClassLoader> =
+        Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap<ClassLoader, Boolean>()))
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         log(Log.INFO, TAG, "onModuleLoaded: ${param.processName}")
@@ -86,24 +93,92 @@ class ModuleEntry : XposedModule() {
     }
 
     private fun initHookingLogic(param: PackageReadyParam) {
-        // Install location hooks as soon as the package class loader is ready. Waiting until after
-        // Application.onCreate lets apps such as WeChat register vendor location listeners before
-        // GeoLocation can wrap them, so those callbacks continue exposing the real location.
-        isolateHook({ log(Log.WARN, TAG, "Application adapters unavailable: ${it.javaClass.simpleName}") }) {
-            locationApiHooks = LocationApiHooks(this, param.classLoader).also { it.initHooks() }
-        }
+        val policy = PreferencesUtil.getAppHookInstallPolicy(param.packageName)
+        log(Log.INFO, TAG, "Initializing hooks for ${param.packageName} with policy $policy")
 
+        when (policy) {
+            HookInstallPolicy.IMMEDIATE -> {
+                installAppHooks(param.classLoader, param.packageName)
+                installApplicationReadyHook(param.classLoader, param.packageName)
+            }
+            HookInstallPolicy.DYNAMIC_CLASSLOAD -> {
+                installAppHooks(param.classLoader, param.packageName)
+                installDynamicClassLoaderHook(param.classLoader, param.packageName)
+                installApplicationReadyHook(param.classLoader, param.packageName)
+            }
+            HookInstallPolicy.APPLICATION_CREATE -> {
+                installApplicationReadyHook(param.classLoader, param.packageName, attachAppHooksOnCreate = true)
+            }
+        }
+    }
+
+    private fun installAppHooks(loader: ClassLoader, packageName: String) {
+        if (!hookedClassLoaders.add(loader)) return
+        isolateHook({ log(Log.WARN, TAG, "Application adapters unavailable for loader $loader: ${it.javaClass.simpleName}") }) {
+            LocationApiHooks(this, loader).also {
+                locationApiHooks = it
+                it.initHooks()
+                log(Log.INFO, TAG, "Installed LocationApiHooks on classLoader: $loader for $packageName")
+            }
+        }
+    }
+
+    private fun installDynamicClassLoaderHook(baseLoader: ClassLoader, packageName: String) {
+        isolateHook({ log(Log.WARN, TAG, "Dynamic ClassLoader hook failed: ${it.javaClass.simpleName}") }) {
+            val loadClassMethod = ClassLoader::class.java.getDeclaredMethod(
+                "loadClass",
+                String::class.java,
+                Boolean::class.javaPrimitiveType
+            )
+
+            hook(loadClassMethod).intercept { chain ->
+                val result = chain.proceed()
+                val targetClassLoader = (chain.thisObject as? ClassLoader)
+                if (targetClassLoader != null && !hookedClassLoaders.contains(targetClassLoader)) {
+                    val className = chain.getArg(0) as? String
+                    // When shell unpacker loads any application or SDK classes, dynamically attach
+                    if (className != null && (
+                            className.startsWith(packageName) ||
+                            className.contains("location", ignoreCase = true) ||
+                            className.contains("amap", ignoreCase = true) ||
+                            className.contains("baidu", ignoreCase = true) ||
+                            className.contains("tencent", ignoreCase = true)
+                        )
+                    ) {
+                        installAppHooks(targetClassLoader, packageName)
+                    }
+                }
+                result
+            }
+            log(Log.INFO, TAG, "Installed dynamic ClassLoader loadClass hook for $packageName")
+        }
+    }
+
+    private fun installApplicationReadyHook(
+        classLoader: ClassLoader,
+        packageName: String,
+        attachAppHooksOnCreate: Boolean = false
+    ) {
         isolateHook({ log(Log.WARN, TAG, "Application-ready retry unavailable: ${it.javaClass.simpleName}") }) {
-            val method = Class.forName("android.app.Instrumentation", false, param.classLoader)
+            val method = Class.forName("android.app.Instrumentation", false, classLoader)
                 .getDeclaredMethod("callApplicationOnCreate", Application::class.java)
 
             hook(method).intercept { chain ->
                 val result = chain.proceed()
 
                 try {
-                    val context = (chain.getArg(0) as Application).applicationContext
+                    val app = chain.getArg(0) as Application
+                    val context = app.applicationContext
+
+                    if (attachAppHooksOnCreate) {
+                        val realLoader = app.classLoader ?: context.classLoader
+                        if (realLoader != null) {
+                            installAppHooks(realLoader, packageName)
+                        }
+                    }
+
                     locationApiHooks?.onApplicationReady(context)
-                    log(Log.INFO, TAG, "Target App's context has been acquired (${param.packageName}).")
+                    log(Log.INFO, TAG, "Target App's context has been acquired ($packageName).")
                     if (PreferencesUtil.getIsPlaying() && PreferencesUtil.getHideFakeLocationToast() != true) {
                         Toast.makeText(context, "Fake Location Is Active!", Toast.LENGTH_SHORT).show()
                     }

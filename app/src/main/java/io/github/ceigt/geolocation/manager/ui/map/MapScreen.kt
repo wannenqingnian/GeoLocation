@@ -110,7 +110,7 @@ import io.github.ceigt.geolocation.data.model.FavoriteLocation
 import io.github.ceigt.geolocation.manager.App
 import io.github.ceigt.geolocation.manager.ui.map.components.MapViewContainer
 import io.github.ceigt.geolocation.manager.ui.favorites.FavoritesViewModel
-import io.github.ceigt.geolocation.manager.ui.settings.LocationMode
+import io.github.ceigt.geolocation.data.model.mode.LocationMode
 import io.github.ceigt.geolocation.manager.ui.settings.SettingsBottomSheet
 import io.github.ceigt.geolocation.manager.ui.settings.SettingsViewModel
 import io.github.ceigt.geolocation.manager.ui.targetapps.TargetAppsBottomSheet
@@ -137,6 +137,9 @@ fun MapScreen(
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val joystickController = remember { io.github.ceigt.geolocation.manager.route.JoystickOverlayController(context) }
+    var isJoystickActive by remember { mutableStateOf(false) }
     val uiState by mapViewModel.uiState.collectAsStateWithLifecycle()
     val xposedService by App.serviceState.collectAsStateWithLifecycle()
     val favoritesViewModel: FavoritesViewModel = viewModel()
@@ -270,6 +273,7 @@ fun MapScreen(
                 if (
                     xposedService == null &&
                     locationMode != LocationMode.MOCK_PROVIDER &&
+                    locationMode != LocationMode.ROOT_MODE &&
                     !showOptionsMenu &&
                     !showFavoritesPanel &&
                     uiState.placeSearchResults.isEmpty() &&
@@ -296,7 +300,9 @@ fun MapScreen(
                     )
                 }
                 if (!hasMapModal) {
-                uiState.hookStatus?.let { status ->
+                val rootRunning = locationMode == LocationMode.ROOT_MODE && isPlaying
+                val displayStatus = if (rootRunning) "Root 模式: 运行中 (系统底层注入)" else uiState.hookStatus
+                displayStatus?.let { status ->
                     Text(status, modifier = Modifier.align(Alignment.BottomCenter)
                         .padding(start = 16.dp, end = 16.dp, bottom = 154.dp)
                         .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(8.dp))
@@ -335,6 +341,64 @@ fun MapScreen(
                         .align(Alignment.BottomEnd)
                         .padding(end = 42.dp, bottom = 47.dp)
                 )
+
+                // Floating Joystick toggle button
+                Surface(
+                    shape = CircleShape,
+                    color = if (isJoystickActive) Color(0xFF006C5F) else Color.White,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 42.dp, bottom = 108.dp)
+                        .size(46.dp)
+                        .clickable {
+                            if (!android.provider.Settings.canDrawOverlays(context)) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("请先授予显示在其他应用上方的悬浮窗权限")
+                                }
+                                val intent = Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                                return@clickable
+                            }
+                            if (isJoystickActive) {
+                                joystickController.hide()
+                                isJoystickActive = false
+                                io.github.ceigt.geolocation.manager.route.RouteSimulationService.stopService(context)
+                            } else {
+                                // Start route service with manual joystick mode
+                                val curLoc = uiState.lastClickedLocation
+                                if (curLoc != null) {
+                                    val wp = io.github.ceigt.geolocation.data.model.route.RouteWaypoint(
+                                        name = "摇杆起点",
+                                        latitude = curLoc.latitude,
+                                        longitude = curLoc.longitude
+                                    )
+                                    io.github.ceigt.geolocation.manager.route.RouteSimulationService.engine.start(
+                                        waypoints = listOf(wp),
+                                        runMode = io.github.ceigt.geolocation.data.model.route.RouteRunMode.MANUAL
+                                    )
+                                    io.github.ceigt.geolocation.manager.route.RouteSimulationService.startService(context)
+                                }
+                                joystickController.show()
+                                isJoystickActive = true
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("悬浮窗摇杆已激活并启动运动推进引擎")
+                                }
+                            }
+                        }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "摇杆悬浮窗",
+                            tint = if (isJoystickActive) Color.White else Color(0xFF006C5F),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
                 }
                 if (mapProvider == MapProvider.OSMDROID) {
                     Text(

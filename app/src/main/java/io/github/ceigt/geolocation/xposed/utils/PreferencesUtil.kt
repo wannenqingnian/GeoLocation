@@ -9,7 +9,30 @@ import io.github.ceigt.geolocation.data.CoordinateSystem
 import io.github.ceigt.geolocation.data.DEFAULT_ACCURACY
 import io.github.ceigt.geolocation.data.DEFAULT_ALTITUDE
 import io.github.ceigt.geolocation.data.DEFAULT_ENABLE_SYSTEM_HOOKS
+import io.github.ceigt.geolocation.data.DEFAULT_ENABLE_GLOBAL_HOOKS
 import io.github.ceigt.geolocation.data.DEFAULT_ENABLE_MOCK_PROVIDER
+import io.github.ceigt.geolocation.data.DEFAULT_ENABLE_ROOT_MODE
+import io.github.ceigt.geolocation.data.DEFAULT_LOCATION_MODE
+import io.github.ceigt.geolocation.data.DEFAULT_MOCK_FLAG_POLICY
+import io.github.ceigt.geolocation.data.DEFAULT_HOOK_INSTALL_POLICY
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_CONSTELLATION_PRESET
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_SIGNAL_STRENGTH_PRESET
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_VISIBLE_SATELLITES
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_USED_SATELLITES
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_JITTER_ENABLED
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_JITTER_ALGORITHM
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_JITTER_RADIUS
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_JITTER_SMOOTHING
+import io.github.ceigt.geolocation.data.DEFAULT_GNSS_JITTER_DRIFT_SPEED
+import io.github.ceigt.geolocation.data.KEY_GNSS_CONSTELLATION_PRESET
+import io.github.ceigt.geolocation.data.KEY_GNSS_SIGNAL_STRENGTH_PRESET
+import io.github.ceigt.geolocation.data.KEY_GNSS_VISIBLE_SATELLITES
+import io.github.ceigt.geolocation.data.KEY_GNSS_USED_SATELLITES
+import io.github.ceigt.geolocation.data.KEY_GNSS_JITTER_ENABLED
+import io.github.ceigt.geolocation.data.KEY_GNSS_JITTER_ALGORITHM
+import io.github.ceigt.geolocation.data.KEY_GNSS_JITTER_RADIUS
+import io.github.ceigt.geolocation.data.KEY_GNSS_JITTER_SMOOTHING
+import io.github.ceigt.geolocation.data.KEY_GNSS_JITTER_DRIFT_SPEED
 import io.github.ceigt.geolocation.data.DEFAULT_HIDE_FAKE_LOCATION_TOAST
 import io.github.ceigt.geolocation.data.DEFAULT_MEAN_SEA_LEVEL
 import io.github.ceigt.geolocation.data.DEFAULT_MEAN_SEA_LEVEL_ACCURACY
@@ -24,12 +47,27 @@ import io.github.ceigt.geolocation.data.DEFAULT_USE_RANDOMIZE
 import io.github.ceigt.geolocation.data.DEFAULT_USE_SPEED
 import io.github.ceigt.geolocation.data.DEFAULT_USE_SPEED_ACCURACY
 import io.github.ceigt.geolocation.data.DEFAULT_USE_VERTICAL_ACCURACY
+import io.github.ceigt.geolocation.data.KEY_GLOBAL_CADENCE_MODE
+import io.github.ceigt.geolocation.data.KEY_GLOBAL_CADENCE_CHANNEL
+import io.github.ceigt.geolocation.data.KEY_GLOBAL_CUSTOM_SPM
+import io.github.ceigt.geolocation.data.KEY_APP_CADENCE_CONFIGS
+import io.github.ceigt.geolocation.data.DEFAULT_GLOBAL_CADENCE_MODE
+import io.github.ceigt.geolocation.data.DEFAULT_GLOBAL_CADENCE_CHANNEL
+import io.github.ceigt.geolocation.data.DEFAULT_GLOBAL_CUSTOM_SPM
 import io.github.ceigt.geolocation.data.DEFAULT_VERTICAL_ACCURACY
 import io.github.ceigt.geolocation.data.KEY_ACCURACY
 import io.github.ceigt.geolocation.data.KEY_APP_COORDINATE_SYSTEMS
 import io.github.ceigt.geolocation.data.KEY_ALTITUDE
 import io.github.ceigt.geolocation.data.KEY_ENABLE_SYSTEM_HOOKS
+import io.github.ceigt.geolocation.data.KEY_ENABLE_GLOBAL_HOOKS
 import io.github.ceigt.geolocation.data.KEY_ENABLE_MOCK_PROVIDER
+import io.github.ceigt.geolocation.data.KEY_ENABLE_ROOT_MODE
+import io.github.ceigt.geolocation.data.KEY_LOCATION_MODE
+import io.github.ceigt.geolocation.data.KEY_LOCATION_ADDRESS_METADATA
+import io.github.ceigt.geolocation.data.KEY_CHANNEL_SETTINGS
+import io.github.ceigt.geolocation.data.KEY_MOCK_FLAG_POLICY
+import io.github.ceigt.geolocation.data.KEY_HOOK_INSTALL_POLICY
+import io.github.ceigt.geolocation.data.KEY_APP_HOOK_INSTALL_POLICIES
 import io.github.ceigt.geolocation.data.KEY_HIDE_FAKE_LOCATION_TOAST
 import io.github.ceigt.geolocation.data.KEY_IS_PLAYING
 import io.github.ceigt.geolocation.data.KEY_LAST_CLICKED_LOCATION
@@ -49,6 +87,9 @@ import io.github.ceigt.geolocation.data.KEY_USE_SPEED_ACCURACY
 import io.github.ceigt.geolocation.data.KEY_USE_VERTICAL_ACCURACY
 import io.github.ceigt.geolocation.data.KEY_VERTICAL_ACCURACY
 import io.github.ceigt.geolocation.data.model.LastClickedLocation
+import io.github.ceigt.geolocation.data.model.mode.HookInstallPolicy
+import io.github.ceigt.geolocation.data.model.mode.LocationMode
+import io.github.ceigt.geolocation.data.model.mode.MockFlagPolicy
 
 object PreferencesUtil {
     private const val TAG = "[PreferencesUtil]"
@@ -117,6 +158,40 @@ object PreferencesUtil {
     fun getSpeedAccuracy(): Float = cache.speedAccuracy
     fun getHideFakeLocationToast(): Boolean = cache.hideFakeLocationToast
     fun getEnableSystemHooks(): Boolean = cache.enableSystemHooks
+    fun getEnableGlobalHooks(): Boolean = cache.enableGlobalHooks
+    fun getEnableRootMode(): Boolean = cache.enableRootMode
+    fun getLocationMode(): LocationMode = cache.locationMode
+    fun getMockFlagPolicy(): MockFlagPolicy = cache.mockFlagPolicy
+    fun getHookInstallPolicy(): HookInstallPolicy = cache.hookInstallPolicy
+    fun getAppHookInstallPolicy(packageName: String): HookInstallPolicy =
+        cache.appHookInstallPolicies[packageName] ?: cache.hookInstallPolicy
+
+    fun getGnssConstellationPreset(): io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset = cache.gnssConstellationPreset
+    fun getGnssSignalStrengthPreset(): io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset = cache.gnssSignalStrengthPreset
+    fun getGnssVisibleSatellites(): Int = cache.gnssVisibleSatellites
+    fun getGnssUsedSatellites(): Int = cache.gnssUsedSatellites
+    fun getGnssJitterEnabled(): Boolean = cache.gnssJitterEnabled
+    fun getGnssJitterAlgorithm(): io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm = cache.gnssJitterAlgorithm
+    fun getGnssJitterRadius(): Double = cache.gnssJitterRadius
+    fun getGnssJitterSmoothing(): Double = cache.gnssJitterSmoothing
+    fun getGnssJitterDriftSpeed(): Double = cache.gnssJitterDriftSpeed
+    fun getChannelSettings(channel: io.github.ceigt.geolocation.data.model.channel.LocationChannel): io.github.ceigt.geolocation.data.model.channel.ChannelSettings =
+        cache.channelSettingsMap[channel.channelKey] ?: io.github.ceigt.geolocation.data.model.channel.ChannelSettings()
+    fun getLocationAddressMetadata(): io.github.ceigt.geolocation.data.model.channel.LocationAddressMetadata = cache.locationAddressMetadata
+    fun getGlobalCadenceMode(): io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = cache.globalCadenceMode
+    fun getGlobalCadenceChannel(): io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel = cache.globalCadenceChannel
+    fun getGlobalCustomSpm(): Int = cache.globalCustomSpm
+    fun getAppCadenceConfig(packageName: String): io.github.ceigt.geolocation.data.model.cadence.TargetCadenceConfig {
+        val appConfig = cache.appCadenceConfigs[packageName]
+        if (appConfig == null || appConfig.mode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.INHERIT) {
+            return io.github.ceigt.geolocation.data.model.cadence.TargetCadenceConfig(
+                mode = cache.globalCadenceMode,
+                customStepsPerMinute = cache.globalCustomSpm,
+                channel = cache.globalCadenceChannel
+            )
+        }
+        return appConfig
+    }
     fun getTargetApps(): Set<String> {
         return snapshot().targetApps
     }
@@ -179,6 +254,27 @@ object PreferencesUtil {
                 DEFAULT_HIDE_FAKE_LOCATION_TOAST
             ),
             enableSystemHooks = prefs.getBoolean(KEY_ENABLE_SYSTEM_HOOKS, DEFAULT_ENABLE_SYSTEM_HOOKS),
+            enableGlobalHooks = prefs.getBoolean(KEY_ENABLE_GLOBAL_HOOKS, DEFAULT_ENABLE_GLOBAL_HOOKS),
+            enableRootMode = prefs.getBoolean(KEY_ENABLE_ROOT_MODE, DEFAULT_ENABLE_ROOT_MODE),
+            locationMode = LocationMode.fromStored(prefs.getString(KEY_LOCATION_MODE, DEFAULT_LOCATION_MODE)),
+            mockFlagPolicy = MockFlagPolicy.fromStored(prefs.getString(KEY_MOCK_FLAG_POLICY, DEFAULT_MOCK_FLAG_POLICY)),
+            hookInstallPolicy = HookInstallPolicy.fromStored(prefs.getString(KEY_HOOK_INSTALL_POLICY, DEFAULT_HOOK_INSTALL_POLICY)),
+            appHookInstallPolicies = parseAppHookInstallPolicies(prefs.getString(KEY_APP_HOOK_INSTALL_POLICIES, null)),
+            gnssConstellationPreset = io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.fromStored(prefs.getString(KEY_GNSS_CONSTELLATION_PRESET, DEFAULT_GNSS_CONSTELLATION_PRESET)),
+            gnssSignalStrengthPreset = io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.fromStored(prefs.getString(KEY_GNSS_SIGNAL_STRENGTH_PRESET, DEFAULT_GNSS_SIGNAL_STRENGTH_PRESET)),
+            gnssVisibleSatellites = prefs.getInt(KEY_GNSS_VISIBLE_SATELLITES, DEFAULT_GNSS_VISIBLE_SATELLITES),
+            gnssUsedSatellites = prefs.getInt(KEY_GNSS_USED_SATELLITES, DEFAULT_GNSS_USED_SATELLITES),
+            gnssJitterEnabled = prefs.getBoolean(KEY_GNSS_JITTER_ENABLED, DEFAULT_GNSS_JITTER_ENABLED),
+            gnssJitterAlgorithm = io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.fromStored(prefs.getString(KEY_GNSS_JITTER_ALGORITHM, DEFAULT_GNSS_JITTER_ALGORITHM)),
+            gnssJitterRadius = readDouble(prefs, KEY_GNSS_JITTER_RADIUS, DEFAULT_GNSS_JITTER_RADIUS),
+            gnssJitterSmoothing = readDouble(prefs, KEY_GNSS_JITTER_SMOOTHING, DEFAULT_GNSS_JITTER_SMOOTHING),
+            gnssJitterDriftSpeed = readDouble(prefs, KEY_GNSS_JITTER_DRIFT_SPEED, DEFAULT_GNSS_JITTER_DRIFT_SPEED),
+            locationAddressMetadata = JsonCodec.decodeAddressMetadata(prefs.getString(KEY_LOCATION_ADDRESS_METADATA, null)),
+            channelSettingsMap = JsonCodec.decodeChannelSettingsMap(prefs.getString(KEY_CHANNEL_SETTINGS, null)),
+            globalCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.fromStored(prefs.getString(KEY_GLOBAL_CADENCE_MODE, DEFAULT_GLOBAL_CADENCE_MODE)),
+            globalCadenceChannel = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.fromStored(prefs.getString(KEY_GLOBAL_CADENCE_CHANNEL, DEFAULT_GLOBAL_CADENCE_CHANNEL)),
+            globalCustomSpm = prefs.getInt(KEY_GLOBAL_CUSTOM_SPM, DEFAULT_GLOBAL_CUSTOM_SPM),
+            appCadenceConfigs = JsonCodec.decodeCadenceConfigs(prefs.getString(KEY_APP_CADENCE_CONFIGS, null)),
             targetApps = parseTargetApps(prefs.getString(KEY_TARGET_APPS, null)),
             appCoordinateSystems = parseAppCoordinateSystems(
                 prefs.getString(KEY_APP_COORDINATE_SYSTEMS, null)
@@ -228,6 +324,15 @@ object PreferencesUtil {
         return java.lang.Double.longBitsToDouble(bits)
     }
 
+    private fun parseAppHookInstallPolicies(json: String?): Map<String, HookInstallPolicy> {
+        if (json.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            JsonCodec.decodeStringMap(json).mapValues { HookInstallPolicy.fromStored(it.value) }
+        }.onFailure {
+            log("Error parsing $KEY_APP_HOOK_INSTALL_POLICIES JSON: ${it.message}", Log.ERROR)
+        }.getOrDefault(emptyMap())
+    }
+
     data class PreferencesSnapshot(
         val isPlaying: Boolean = false,
         val lastClickedLocation: LastClickedLocation? = null,
@@ -249,6 +354,27 @@ object PreferencesUtil {
         val speedAccuracy: Float = DEFAULT_SPEED_ACCURACY,
         val hideFakeLocationToast: Boolean = DEFAULT_HIDE_FAKE_LOCATION_TOAST,
         val enableSystemHooks: Boolean = DEFAULT_ENABLE_SYSTEM_HOOKS,
+        val enableGlobalHooks: Boolean = DEFAULT_ENABLE_GLOBAL_HOOKS,
+        val enableRootMode: Boolean = DEFAULT_ENABLE_ROOT_MODE,
+        val locationMode: LocationMode = LocationMode.APPLICATION_HOOK,
+        val mockFlagPolicy: MockFlagPolicy = MockFlagPolicy.HIDE_ALL,
+        val hookInstallPolicy: HookInstallPolicy = HookInstallPolicy.IMMEDIATE,
+        val appHookInstallPolicies: Map<String, HookInstallPolicy> = emptyMap(),
+        val gnssConstellationPreset: io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset = io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED,
+        val gnssSignalStrengthPreset: io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset = io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL,
+        val gnssVisibleSatellites: Int = DEFAULT_GNSS_VISIBLE_SATELLITES,
+        val gnssUsedSatellites: Int = DEFAULT_GNSS_USED_SATELLITES,
+        val gnssJitterEnabled: Boolean = DEFAULT_GNSS_JITTER_ENABLED,
+        val gnssJitterAlgorithm: io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm = io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV,
+        val gnssJitterRadius: Double = DEFAULT_GNSS_JITTER_RADIUS,
+        val gnssJitterSmoothing: Double = DEFAULT_GNSS_JITTER_SMOOTHING,
+        val gnssJitterDriftSpeed: Double = DEFAULT_GNSS_JITTER_DRIFT_SPEED,
+        val locationAddressMetadata: io.github.ceigt.geolocation.data.model.channel.LocationAddressMetadata = io.github.ceigt.geolocation.data.model.channel.LocationAddressMetadata(),
+        val channelSettingsMap: Map<String, io.github.ceigt.geolocation.data.model.channel.ChannelSettings> = emptyMap(),
+        val globalCadenceMode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+        val globalCadenceChannel: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.ACCELEROMETER,
+        val globalCustomSpm: Int = DEFAULT_GLOBAL_CUSTOM_SPM,
+        val appCadenceConfigs: Map<String, io.github.ceigt.geolocation.data.model.cadence.TargetCadenceConfig> = emptyMap(),
         val targetApps: Set<String> = emptySet(),
         val appCoordinateSystems: Map<String, CoordinateSystem> = emptyMap()
     )

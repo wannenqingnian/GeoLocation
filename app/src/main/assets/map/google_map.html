@@ -70,6 +70,10 @@
     api.async=true;
     api.onerror=()=>{ callAndroid('onMapDiagnostic','ScriptLoadFailure'); callAndroid('onMapError'); };
     document.head.appendChild(api);
+
+    const trackEditor=document.createElement('script');
+    trackEditor.src='track_editor.js';
+    document.head.appendChild(trackEditor);
 })();
 </script>
 </body>
