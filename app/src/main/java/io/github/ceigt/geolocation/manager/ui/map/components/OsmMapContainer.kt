@@ -63,7 +63,7 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             setTileSource(source)
             setMultiTouchControls(true)
             minZoomLevel = maxOf(WORLD_MAP_ZOOM, source.minimumZoomLevel.toDouble())
-            maxZoomLevel = source.maximumZoomLevel.toDouble()
+            maxZoomLevel = 22.0
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(point: OsmPoint): Boolean {
                     interaction()

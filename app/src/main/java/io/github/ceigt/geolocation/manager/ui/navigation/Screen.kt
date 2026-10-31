@@ -10,4 +10,5 @@ sealed class Screen(val route: String) {
     object Environment : Screen("environment")
     object Ble : Screen("ble")
     object Nfc : Screen("nfc")
+    object Route : Screen("route")
 }

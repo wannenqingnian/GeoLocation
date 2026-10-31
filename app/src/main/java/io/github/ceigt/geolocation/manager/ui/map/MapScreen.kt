@@ -474,7 +474,10 @@ fun MapScreen(
         TargetAppsBottomSheet(onDismissRequest = { showTargetAppsSheet = false })
     }
     if (showSettingsSheet) {
-        SettingsBottomSheet(onDismissRequest = { showSettingsSheet = false })
+        SettingsBottomSheet(
+            onDismissRequest = { showSettingsSheet = false },
+            navController = navController
+        )
     }
     if (uiState.showMapQuotaDialog) {
         BaiduMapQuotaDialog(

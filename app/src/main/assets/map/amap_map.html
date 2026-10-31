@@ -62,7 +62,7 @@
 
     window.initAmapTraceMap=()=>{
         try {
-            map=new AMap.Map('map',{zoom:3,center:[0,0],viewMode:'2D',resizeEnable:true});
+            map=new AMap.Map('map',{zoom:3,zooms:[3,20],center:[0,0],viewMode:'2D',resizeEnable:true});
             map.on('click',event=>{ if(event&&event.lnglat){ const p=positionOf(event.lnglat); callAndroid('onMapClicked',p.latitude,p.longitude); } });
             map.on('dragstart',()=>callAndroid('onMapInteraction'));
             map.on('zoomstart',()=>callAndroid('onMapInteraction'));

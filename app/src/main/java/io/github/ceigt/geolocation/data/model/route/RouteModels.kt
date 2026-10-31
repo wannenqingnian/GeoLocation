@@ -84,3 +84,12 @@ data class RouteFavorite(
     val travelMode: RouteTravelMode = RouteTravelMode.WALKING,
     val createdAtEpochMillis: Long = System.currentTimeMillis()
 )
+
+data class TrackEditorConfig(
+    val centerLat: Double,
+    val centerLon: Double,
+    val scale: Float = 1.0f,
+    val rotationDegrees: Float = 0f,
+    val laps: Int = 1,
+    val clockwise: Boolean = true
+)

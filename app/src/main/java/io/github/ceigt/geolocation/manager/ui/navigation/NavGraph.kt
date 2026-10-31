@@ -142,6 +142,9 @@ fun AppNavGraph(
             composable(route = Screen.Nfc.route) {
                 io.github.ceigt.geolocation.manager.ui.nfc.NfcScreen(navController = navController)
             }
+            composable(route = Screen.Route.route) {
+                io.github.ceigt.geolocation.manager.ui.route.RouteSimulationScreen(navController = navController)
+            }
         }
 
     }

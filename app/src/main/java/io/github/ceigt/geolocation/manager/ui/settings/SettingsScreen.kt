@@ -90,6 +90,7 @@ import io.github.ceigt.geolocation.manager.control.ControlReceiver
 import io.github.ceigt.geolocation.manager.localization.LanguageOption
 import io.github.ceigt.geolocation.manager.localization.LocaleController
 import io.github.ceigt.geolocation.manager.map.WebMapCache
+import io.github.ceigt.geolocation.manager.ui.navigation.Screen
 import kotlinx.coroutines.launch
 
 private object Dimensions {
@@ -409,6 +410,352 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
 
+                CategoryHeader("加固与模拟标志策略")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.SPACING_SMALL),
+                    shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                    colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
+                ) {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        Text(
+                            text = "加固应用挂载策略",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val installPolicy by settingsViewModel.hookInstallPolicy.collectAsState()
+                        LocationModeOption(
+                            title = "立即挂载 (IMMEDIATE)",
+                            description = "PackageReady 阶段立即注入主 ClassLoader",
+                            selected = installPolicy == HookInstallPolicy.IMMEDIATE,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.IMMEDIATE) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "动态类加载挂载 (DYNAMIC_CLASSLOAD)",
+                            description = "Hook loadClass，针对加壳应用解密后真实 ClassLoader 挂载",
+                            selected = installPolicy == HookInstallPolicy.DYNAMIC_CLASSLOAD,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.DYNAMIC_CLASSLOAD) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "Application 启动时补装 (APPLICATION_CREATE)",
+                            description = "在 callApplicationOnCreate 时根据获取的真实 ClassLoader 补装",
+                            selected = installPolicy == HookInstallPolicy.APPLICATION_CREATE,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.APPLICATION_CREATE) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        Text(
+                            text = "Mock 标志剥离策略",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val flagPolicy by settingsViewModel.mockFlagPolicy.collectAsState()
+                        LocationModeOption(
+                            title = "完全剥离 (HIDE_ALL)",
+                            description = "清除 isFromMockProvider、setMock 与 mFieldsMask mock bit",
+                            selected = flagPolicy == MockFlagPolicy.HIDE_ALL,
+                            onClick = { settingsViewModel.setMockFlagPolicy(MockFlagPolicy.HIDE_ALL) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "保留原始标志 (PRESERVE)",
+                            description = "不主动清除系统 Mock 标志（调试场景）",
+                            selected = flagPolicy == MockFlagPolicy.PRESERVE,
+                            onClick = { settingsViewModel.setMockFlagPolicy(MockFlagPolicy.PRESERVE) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
+
+                CategoryHeader("GNSS 卫星模拟与星座状态")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.SPACING_SMALL),
+                    shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                    colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
+                ) {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        val constellationPreset by settingsViewModel.gnssConstellationPreset.collectAsState()
+                        LocationModeOption(
+                            title = "混合多模 (GPS + 北斗 + Galileo + GLONASS)",
+                            description = "模拟真实户外多星座联合解算状态",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "仅北斗 (BDS Only)",
+                            description = "纯北斗卫星星座导航频段模拟",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.BEIDOU_ONLY,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.BEIDOU_ONLY) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "仅 GPS (GPS Only)",
+                            description = "纯美标 GPS 卫星星座频段模拟",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.GPS_ONLY,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.GPS_ONLY) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        val visibleSatellites by settingsViewModel.gnssVisibleSatellites.collectAsState()
+                        Text(
+                            text = "可见卫星数量: $visibleSatellites 颗",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        Slider(
+                            value = visibleSatellites.toFloat(),
+                            onValueChange = { settingsViewModel.setGnssVisibleSatellites(it.toInt()) },
+                            valueRange = 8f..36f,
+                            steps = 28
+                        )
+
+                        val usedSatellites by settingsViewModel.gnssUsedSatellites.collectAsState()
+                        Text(
+                            text = "参与解算卫星数量: $usedSatellites 颗",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        Slider(
+                            value = usedSatellites.coerceAtMost(visibleSatellites).toFloat(),
+                            onValueChange = { settingsViewModel.setGnssUsedSatellites(it.toInt().coerceAtMost(visibleSatellites)) },
+                            valueRange = 4f..36f,
+                            steps = 32
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        val signalPreset by settingsViewModel.gnssSignalStrengthPreset.collectAsState()
+                        LocationModeOption(
+                            title = "强信号 (GOOD: 38~48 dB-Hz)",
+                            description = "开阔室外、晴朗天候，优质卫星几何分布",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.GOOD,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.GOOD) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "标准信号 (NORMAL: 28~38 dB-Hz)",
+                            description = "典型城市道路与轻度遮挡环境",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "微弱信号 (WEAK: 18~26 dB-Hz)",
+                            description = "建筑物窗边、高架下或树荫密集处",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.WEAK,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.WEAK) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
+
+                CategoryHeader("高阶定位数学抖动模型 (GnssJitter)")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.SPACING_SMALL),
+                    shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                    colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
+                ) {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        val jitterEnabled by settingsViewModel.gnssJitterEnabled.collectAsState()
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(Dimensions.SPACING_SMALL),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("启用高阶定位抖动模型", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                                Text("模拟真实卫星信号大气延迟与载波多径波动", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = jitterEnabled, onCheckedChange = { settingsViewModel.setGnssJitterEnabled(it) })
+                        }
+                        if (jitterEnabled) {
+                            val jitterAlgo by settingsViewModel.gnssJitterAlgorithm.collectAsState()
+                            LocationModeOption(
+                                title = "一阶高斯-马尔可夫随机游走 (FIRST_ORDER_MARKOV)",
+                                description = "平滑连续相关随机漂移模型",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV) }
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            LocationModeOption(
+                                title = "二阶马尔可夫惯性漂移 (SECOND_ORDER_MARKOV)",
+                                description = "具备方向惯性记忆与阻尼回归",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.SECOND_ORDER_MARKOV,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.SECOND_ORDER_MARKOV) }
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            LocationModeOption(
+                                title = "低通滤波高斯白噪声 (FILTERED_GAUSSIAN)",
+                                description = "轻度滤波白噪声",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FILTERED_GAUSSIAN,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FILTERED_GAUSSIAN) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                            val jitterRadius by settingsViewModel.gnssJitterRadius.collectAsState()
+                            Text("漂移半径: ${"%.1f".format(jitterRadius)} 米", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterRadius.toFloat(), onValueChange = { settingsViewModel.setGnssJitterRadius(it.toDouble()) }, valueRange = 0.5f..10.0f)
+
+                            val jitterSmoothing by settingsViewModel.gnssJitterSmoothing.collectAsState()
+                            Text("平滑滤波比例: ${"%.2f".format(jitterSmoothing)}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterSmoothing.toFloat(), onValueChange = { settingsViewModel.setGnssJitterSmoothing(it.toDouble()) }, valueRange = 0.1f..0.98f)
+
+                            val jitterDriftSpeed by settingsViewModel.gnssJitterDriftSpeed.collectAsState()
+                            Text("最大惯性漂移速度: ${"%.2f".format(jitterDriftSpeed)} m/s", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterDriftSpeed.toFloat(), onValueChange = { settingsViewModel.setGnssJitterDriftSpeed(it.toDouble()) }, valueRange = 0.05f..2.0f)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
+
+                CategoryHeader("步频与传感器步频模拟 (Cadence SPM)")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.SPACING_SMALL),
+                    shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                    colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
+                ) {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        Text(
+                            text = "全局步频控制模式",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = Dimensions.SPACING_SMALL, vertical = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val cadenceMode by settingsViewModel.globalCadenceMode.collectAsState()
+                        LocationModeOption(
+                            title = "速度动态自适应 (AUTO)",
+                            description = "慢速行走 90~150 SPM，跑步阶段 150~200 SPM 自动线性拟合",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "固定自定义步频 (CUSTOM)",
+                            description = "强制以设定的固定步频每分钟产生步数与加速度震颤",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "关闭步频与传感器模拟 (OFF)",
+                            description = "不干预系统的加速度计与计步器原生硬件数据",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF) }
+                        )
+
+                        if (cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL),
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+
+                            val customSpm by settingsViewModel.globalCustomSpm.collectAsState()
+                            Text(
+                                text = "目标自定义步频: $customSpm SPM",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = Dimensions.SPACING_SMALL, vertical = Dimensions.SPACING_EXTRA_SMALL)
+                            )
+                            Slider(
+                                value = customSpm.toFloat(),
+                                onValueChange = { settingsViewModel.setGlobalCustomSpm(it.toInt()) },
+                                valueRange = 60f..220f,
+                                steps = 160,
+                                modifier = Modifier.padding(horizontal = Dimensions.SPACING_SMALL)
+                            )
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL),
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+
+                        Text(
+                            text = "传感器模拟通道",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = Dimensions.SPACING_SMALL, vertical = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val cadenceChannel by settingsViewModel.globalCadenceChannel.collectAsState()
+                        LocationModeOption(
+                            title = "计步器 + 3D 加速度计 (ACCELEROMETER)",
+                            description = "合成三轴正弦运动重力摆动波形与计步事件，适配严格运动风控",
+                            selected = cadenceChannel == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.ACCELEROMETER,
+                            onClick = { settingsViewModel.setGlobalCadenceChannel(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.ACCELEROMETER) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "仅标准计步传感器 (STANDARD_STEP_SENSORS)",
+                            description = "仅更新 StepCounter 和 StepDetector，不合成震动波形",
+                            selected = cadenceChannel == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.STANDARD_STEP_SENSORS,
+                            onClick = { settingsViewModel.setGlobalCadenceChannel(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceChannel.STANDARD_STEP_SENSORS) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
+
+                CategoryHeader("高级模拟子系统")
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.SPACING_SMALL),
+                    shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                    colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
+                ) {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        LocationModeOption(
+                            title = "路线规划与跑道巡航 (Route Simulation)",
+                            description = "管理已收藏的巡航路线、一键生成标准 400 米环形跑道并启动模拟",
+                            selected = false,
+                            onClick = { navController.navigate(io.github.ceigt.geolocation.manager.ui.navigation.Screen.Route.route) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "Wi-Fi 与蜂窝基站模拟 (Virtual Environment)",
+                            description = "配置虚拟 AP 热点与 4G/5G 蜂窝基站，支持现场一键真实无线电采样",
+                            selected = false,
+                            onClick = { navController.navigate(io.github.ceigt.geolocation.manager.ui.navigation.Screen.Environment.route) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "蓝牙 BLE 信标与外设模拟 (BLE Peripheral)",
+                            description = "模拟考勤打卡信标、iBeacon 广播与 GATT 响应，支持硬件广播与虚拟注入",
+                            selected = false,
+                            onClick = { navController.navigate(io.github.ceigt.geolocation.manager.ui.navigation.Screen.Ble.route) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "NFC 标签读写与虚拟派发 (NFC Simulation)",
+                            description = "读取实体 NFC 卡片 NDEF 记录，支持免贴卡向目标应用直接派发虚拟标签",
+                            selected = false,
+                            onClick = { navController.navigate(io.github.ceigt.geolocation.manager.ui.navigation.Screen.Nfc.route) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
+
                 CategoryHeader(stringResource(R.string.category_map_service))
                 Card(
                     modifier = Modifier
@@ -533,6 +880,7 @@ fun SettingsScreen(
 @Composable
 fun SettingsBottomSheet(
     onDismissRequest: () -> Unit,
+    navController: NavController? = null,
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -659,6 +1007,281 @@ fun SettingsBottomSheet(
                         onModeSelected = settingsViewModel::selectLocationMode
                     )
                 }
+
+                SettingsSheetSection("高级模拟子系统") {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        LocationModeOption(
+                            title = "路线规划与跑道巡航 (Route Simulation)",
+                            description = "管理已收藏的巡航路线、一键生成标准 400 米环形跑道并启动模拟",
+                            selected = false,
+                            onClick = {
+                                onDismissRequest()
+                                navController?.navigate(Screen.Route.route)
+                            }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "Wi-Fi 与蜂窝基站模拟 (Virtual Environment)",
+                            description = "配置虚拟 AP 热点与 4G/5G 蜂窝基站，支持现场一键真实无线电采样",
+                            selected = false,
+                            onClick = {
+                                onDismissRequest()
+                                navController?.navigate(Screen.Environment.route)
+                            }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "蓝牙 BLE 信标与外设模拟 (BLE Peripheral)",
+                            description = "模拟考勤打卡信标、iBeacon 广播与 GATT 响应，支持硬件广播与虚拟注入",
+                            selected = false,
+                            onClick = {
+                                onDismissRequest()
+                                navController?.navigate(Screen.Ble.route)
+                            }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "NFC 标签读写与虚拟派发 (NFC Simulation)",
+                            description = "读取实体 NFC 卡片 NDEF 记录，支持免贴卡向目标应用直接派发虚拟标签",
+                            selected = false,
+                            onClick = {
+                                onDismissRequest()
+                                navController?.navigate(Screen.Nfc.route)
+                            }
+                        )
+                    }
+                }
+
+                SettingsSheetSection("加固与模拟标志策略") {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        Text(
+                            text = "加固应用挂载策略",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val installPolicy by settingsViewModel.hookInstallPolicy.collectAsState()
+                        LocationModeOption(
+                            title = "立即挂载 (IMMEDIATE)",
+                            description = "PackageReady 阶段立即注入主 ClassLoader",
+                            selected = installPolicy == HookInstallPolicy.IMMEDIATE,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.IMMEDIATE) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "动态类加载挂载 (DYNAMIC_CLASSLOAD)",
+                            description = "Hook loadClass，针对加壳应用解密后真实 ClassLoader 挂载",
+                            selected = installPolicy == HookInstallPolicy.DYNAMIC_CLASSLOAD,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.DYNAMIC_CLASSLOAD) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "Application 启动时补装 (APPLICATION_CREATE)",
+                            description = "在 callApplicationOnCreate 时根据获取的真实 ClassLoader 补装",
+                            selected = installPolicy == HookInstallPolicy.APPLICATION_CREATE,
+                            onClick = { settingsViewModel.setHookInstallPolicy(HookInstallPolicy.APPLICATION_CREATE) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        Text(
+                            text = "Mock 标志剥离策略",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        val flagPolicy by settingsViewModel.mockFlagPolicy.collectAsState()
+                        LocationModeOption(
+                            title = "完全剥离 (HIDE_ALL)",
+                            description = "清除 isFromMockProvider、setMock 与 mFieldsMask mock bit",
+                            selected = flagPolicy == MockFlagPolicy.HIDE_ALL,
+                            onClick = { settingsViewModel.setMockFlagPolicy(MockFlagPolicy.HIDE_ALL) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "保留原始标志 (PRESERVE)",
+                            description = "不主动清除系统 Mock 标志（调试场景）",
+                            selected = flagPolicy == MockFlagPolicy.PRESERVE,
+                            onClick = { settingsViewModel.setMockFlagPolicy(MockFlagPolicy.PRESERVE) }
+                        )
+                    }
+                }
+
+                SettingsSheetSection("GNSS 卫星模拟与星座状态") {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        val constellationPreset by settingsViewModel.gnssConstellationPreset.collectAsState()
+                        LocationModeOption(
+                            title = "混合多模 (GPS + 北斗 + Galileo + GLONASS)",
+                            description = "模拟真实户外多星座联合解算状态",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.AUTO_MIXED) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "仅北斗 (BDS Only)",
+                            description = "纯北斗卫星星座导航频段模拟",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.BEIDOU_ONLY,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.BEIDOU_ONLY) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "仅 GPS (GPS Only)",
+                            description = "纯美标 GPS 卫星星座频段模拟",
+                            selected = constellationPreset == io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.GPS_ONLY,
+                            onClick = { settingsViewModel.setGnssConstellationPreset(io.github.ceigt.geolocation.data.model.gnss.GnssConstellationPreset.GPS_ONLY) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        val visibleSatellites by settingsViewModel.gnssVisibleSatellites.collectAsState()
+                        Text(
+                            text = "可见卫星数量: $visibleSatellites 颗",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        Slider(
+                            value = visibleSatellites.toFloat(),
+                            onValueChange = { settingsViewModel.setGnssVisibleSatellites(it.toInt()) },
+                            valueRange = 8f..36f,
+                            steps = 28
+                        )
+
+                        val usedSatellites by settingsViewModel.gnssUsedSatellites.collectAsState()
+                        Text(
+                            text = "参与解算卫星数量: $usedSatellites 颗",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = Dimensions.SPACING_EXTRA_SMALL)
+                        )
+                        Slider(
+                            value = usedSatellites.coerceAtMost(visibleSatellites).toFloat(),
+                            onValueChange = { settingsViewModel.setGnssUsedSatellites(it.toInt().coerceAtMost(visibleSatellites)) },
+                            valueRange = 4f..36f,
+                            steps = 32
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                        val signalPreset by settingsViewModel.gnssSignalStrengthPreset.collectAsState()
+                        LocationModeOption(
+                            title = "强信号 (GOOD: 38~48 dB-Hz)",
+                            description = "开阔室外、晴朗天候，优质卫星几何分布",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.GOOD,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.GOOD) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "标准信号 (NORMAL: 28~38 dB-Hz)",
+                            description = "典型城市道路与轻度遮挡环境",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.NORMAL) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "微弱信号 (WEAK: 18~26 dB-Hz)",
+                            description = "建筑物窗边、高架下或树荫密集处",
+                            selected = signalPreset == io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.WEAK,
+                            onClick = { settingsViewModel.setGnssSignalStrengthPreset(io.github.ceigt.geolocation.data.model.gnss.GnssSignalStrengthPreset.WEAK) }
+                        )
+                    }
+                }
+
+                SettingsSheetSection("高阶定位数学抖动模型 (GnssJitter)") {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        val jitterEnabled by settingsViewModel.gnssJitterEnabled.collectAsState()
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(Dimensions.SPACING_SMALL),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("启用高阶定位抖动模型", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                                Text("模拟真实卫星信号大气延迟与载波多径波动", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = jitterEnabled, onCheckedChange = { settingsViewModel.setGnssJitterEnabled(it) })
+                        }
+                        if (jitterEnabled) {
+                            val jitterAlgo by settingsViewModel.gnssJitterAlgorithm.collectAsState()
+                            LocationModeOption(
+                                title = "一阶高斯-马尔可夫随机游走 (FIRST_ORDER_MARKOV)",
+                                description = "平滑连续相关随机漂移模型",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FIRST_ORDER_MARKOV) }
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            LocationModeOption(
+                                title = "二阶马尔可夫惯性漂移 (SECOND_ORDER_MARKOV)",
+                                description = "具备方向惯性记忆与阻尼回归",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.SECOND_ORDER_MARKOV,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.SECOND_ORDER_MARKOV) }
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            LocationModeOption(
+                                title = "低通滤波高斯白噪声 (FILTERED_GAUSSIAN)",
+                                description = "轻度滤波白噪声",
+                                selected = jitterAlgo == io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FILTERED_GAUSSIAN,
+                                onClick = { settingsViewModel.setGnssJitterAlgorithm(io.github.ceigt.geolocation.data.model.gnss.GnssJitterAlgorithm.FILTERED_GAUSSIAN) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL), color = MaterialTheme.colorScheme.outlineVariant)
+
+                            val jitterRadius by settingsViewModel.gnssJitterRadius.collectAsState()
+                            Text("漂移半径: ${"%.1f".format(jitterRadius)} 米", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterRadius.toFloat(), onValueChange = { settingsViewModel.setGnssJitterRadius(it.toDouble()) }, valueRange = 0.5f..10.0f)
+
+                            val jitterSmoothing by settingsViewModel.gnssJitterSmoothing.collectAsState()
+                            Text("平滑滤波比例: ${"%.2f".format(jitterSmoothing)}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterSmoothing.toFloat(), onValueChange = { settingsViewModel.setGnssJitterSmoothing(it.toDouble()) }, valueRange = 0.1f..0.98f)
+
+                            val jitterDriftSpeed by settingsViewModel.gnssJitterDriftSpeed.collectAsState()
+                            Text("最大惯性漂移速度: ${"%.2f".format(jitterDriftSpeed)} m/s", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Slider(value = jitterDriftSpeed.toFloat(), onValueChange = { settingsViewModel.setGnssJitterDriftSpeed(it.toDouble()) }, valueRange = 0.05f..2.0f)
+                        }
+                    }
+                }
+
+                SettingsSheetSection("步频与传感器模拟 (Cadence SPM)") {
+                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                        val cadenceMode by settingsViewModel.globalCadenceMode.collectAsState()
+                        LocationModeOption(
+                            title = "速度动态自适应 (AUTO)",
+                            description = "慢速行走 90~150 SPM，跑步阶段 150~200 SPM 自动拟合",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "固定自定义步频 (CUSTOM)",
+                            description = "强制以设定的固定步频每分钟产生步数与加速度震颤",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) }
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        LocationModeOption(
+                            title = "关闭步频与传感器模拟 (OFF)",
+                            description = "不干预系统的加速度计与计步器原生硬件数据",
+                            selected = cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF,
+                            onClick = { settingsViewModel.setGlobalCadenceMode(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF) }
+                        )
+                        if (cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
+                            val customSpm by settingsViewModel.globalCustomSpm.collectAsState()
+                            Text(
+                                text = "目标步频: $customSpm SPM",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Slider(
+                                value = customSpm.toFloat(),
+                                onValueChange = { settingsViewModel.setGlobalCustomSpm(it.toInt()) },
+                                valueRange = 60f..220f,
+                                steps = 160
+                            )
+                        }
+                    }
+                }
+
                 SettingsSheetSection(stringResource(R.string.category_map_service)) {
                     MapServiceSettings(
                         provider = settingsViewModel.mapProvider.collectAsState().value,
