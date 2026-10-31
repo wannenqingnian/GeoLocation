@@ -191,10 +191,10 @@ object LocationUtil {
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val maskField = try {
-                    location.javaClass.getDeclaredField("mFieldsMask").apply { isAccessible = true }
-                } catch (t: Throwable) {
                     HiddenApiBypass.getInstanceFields(location.javaClass)
                         .firstOrNull { (it as? java.lang.reflect.Field)?.name == "mFieldsMask" } as? java.lang.reflect.Field
+                } catch (t: Throwable) {
+                    null
                 }
                 maskField?.let { field ->
                     field.isAccessible = true

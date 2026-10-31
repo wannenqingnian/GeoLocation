@@ -1,5 +1,6 @@
 package io.github.ceigt.geolocation.manager.ui.ble
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.ScanCallback
@@ -35,6 +36,7 @@ enum class BleUiTab {
     DISCOVERY
 }
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BleScreen(navController: NavController) {

@@ -1,5 +1,6 @@
 package io.github.ceigt.geolocation.manager.ui.environment
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -38,6 +39,7 @@ import io.github.ceigt.geolocation.data.model.environment.VirtualWifiAp
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
 import kotlinx.coroutines.launch
 
+@SuppressLint("MissingPermission")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EnvironmentSimulationScreen(navController: NavController) {
