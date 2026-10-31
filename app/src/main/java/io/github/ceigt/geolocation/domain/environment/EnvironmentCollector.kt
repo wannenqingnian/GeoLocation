@@ -117,6 +117,7 @@ class EnvironmentCollector(context: Context) {
 
     // region Location
 
+    @SuppressLint("MissingPermission")
     private suspend fun collectLocation(): Capture<Location?> {
         if (!fineLocationGranted) {
             return Capture(null, "未授予精准定位权限，坐标未采集")
@@ -377,6 +378,7 @@ class EnvironmentCollector(context: Context) {
             ) == PackageManager.PERMISSION_GRANTED
         }
 
+    @SuppressLint("MissingPermission")
     private fun addBleResult(
         found: ConcurrentHashMap<String, BleDeviceProfile>,
         result: ScanResult
