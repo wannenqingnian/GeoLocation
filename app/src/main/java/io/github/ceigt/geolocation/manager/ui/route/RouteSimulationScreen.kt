@@ -40,6 +40,9 @@ fun RouteSimulationScreen(navController: NavController) {
     val repository = remember { PreferencesRepository(context) }
     val scope = rememberCoroutineScope()
 
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabTitles = listOf("路线管理", "真实采集", "离线回放", "对照评估")
+
     val favorites by repository.getRouteFavoritesFlow().collectAsState(initial = emptyList())
     val engineState = RouteSimulationService.engine.state
     var isRunning by remember { mutableStateOf(engineState.isActive) }
@@ -65,200 +68,100 @@ fun RouteSimulationScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("路线与跑道模拟管理", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+            Column {
+                TopAppBar(
+                    title = { Text("路线模拟与运动数据验证", fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                )
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF006C5F)
+                ) {
+                    tabTitles.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = { Text(title, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        )
                     }
                 }
-            )
+            }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
         ) {
-            // Real-time Simulation Status Card
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isRunning) Color(0xFFE8F5E9) else Color(0xFFF7FDFD))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = if (isRunning) "路线模拟运行中 (巡航推进)" else "路线模拟已停止",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isRunning) Color(0xFF1B5E20) else Color(0xFF334155)
-                            )
-                            val speedStr = "%.1f".format(engineState.speedMetersPerSecond)
-                            Text(
-                                text = "速度: $speedStr m/s (${(engineState.speedMetersPerSecond * 3.6).roundToInt()} km/h)",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                if (isRunning) {
-                                    RouteSimulationService.stopService(context)
-                                    isRunning = false
+            when (selectedTab) {
+                0 -> {
+                    RouteManagementTab(
+                        favorites = favorites,
+                        isRunning = isRunning,
+                        engineState = engineState,
+                        onToggleSimulation = {
+                            if (isRunning) {
+                                RouteSimulationService.stopService(context)
+                                isRunning = false
+                            } else {
+                                val curLoc = repository.getLastClickedLocation()
+                                if (curLoc != null) {
+                                    val trackWps = TrackGenerator.generateStadiumTrack(
+                                        TrackEditorConfig(curLoc.latitude, curLoc.longitude)
+                                    )
+                                    RouteSimulationService.engine.start(
+                                        waypoints = trackWps,
+                                        runMode = RouteRunMode.AUTOMATIC
+                                    )
+                                    checkNotificationPermission()
+                                    RouteSimulationService.startService(context)
+                                    isRunning = true
+                                    Toast.makeText(context, "已启动 400 米标准环形跑道模拟巡航", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    val curLoc = repository.getLastClickedLocation()
-                                    if (curLoc != null) {
-                                        val trackWps = TrackGenerator.generateStadiumTrack(
-                                            TrackEditorConfig(curLoc.latitude, curLoc.longitude)
-                                        )
-                                        RouteSimulationService.engine.start(
-                                            waypoints = trackWps,
-                                            runMode = RouteRunMode.AUTOMATIC
-                                        )
-                                        checkNotificationPermission()
-                                        RouteSimulationService.startService(context)
-                                        isRunning = true
-                                        Toast.makeText(context, "已启动 400 米标准环形跑道模拟巡航", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "请先在地图上选定起点或跑道中心点", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isRunning) MaterialTheme.colorScheme.error else Color(0xFF006C5F)
-                            )
-                        ) {
-                            Icon(if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (isRunning) "停止模拟" else "标准跑道巡航")
-                        }
-                    }
-
-                    if (isRunning) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 10.dp),
-                            color = Color(0xFF81C784).copy(alpha = 0.5f)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("已巡航: ${"%.1f".format(engineState.traveledMeters)} 米", style = MaterialTheme.typography.labelMedium)
-                            Text("当前步频: ${engineState.currentSpm} SPM", style = MaterialTheme.typography.labelMedium, color = Color(0xFF006C5F))
-                            Text("已走步数: ${engineState.currentStepCount} 步", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("已收藏路线 (${favorites.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { navController.popBackStack() }) {
-                    Icon(Icons.Default.AddLocationAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("前往地图规划路线")
-                }
-            }
-
-            if (favorites.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    Text("暂无收藏路线。前往地图主界面可自由打点、手绘或自动生成路线！", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
-                    items(favorites, key = { it.id }) { rf ->
-                        val geoPoints = rf.waypoints.map { GeoPoint(it.latitude, it.longitude) }
-                        val distMeters = RoutePlanner.computeTotalDistanceMeters(geoPoints)
-                        val estSteps = RoutePlanner.estimateSteps(distMeters, rf.speedMps)
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(rf.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            "航点: ${rf.waypoints.size} 个 | 里程: ${"%.2f".format(distMeters / 1000.0)} km | 预计: $estSteps 步",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color(0xFF52615E)
-                                        )
-                                        Text(
-                                            "速度: ${"%.1f".format(rf.speedMps)} m/s (${(rf.speedMps * 3.6).roundToInt()} km/h) | 循环: ${rf.loopMode.name} | 步频: ${rf.cadenceMode.name}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFF006C5F)
-                                        )
-                                    }
-
-                                    Row {
-                                        // Edit Route button
-                                        IconButton(onClick = {
-                                            editingRoute = rf
-                                            editName = rf.name
-                                            editSpeedMps = rf.speedMps
-                                            editLoopMode = rf.loopMode
-                                            editCadenceMode = rf.cadenceMode
-                                            editCustomSpm = rf.customSpm
-                                        }) {
-                                            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color(0xFF006C5F))
-                                        }
-
-                                        // Play Route button
-                                        IconButton(
-                                            onClick = {
-                                                RouteSimulationService.engine.start(
-                                                    waypoints = rf.waypoints,
-                                                    travelMode = rf.travelMode,
-                                                    loopMode = rf.loopMode,
-                                                    speedMps = rf.speedMps,
-                                                    runMode = RouteRunMode.AUTOMATIC,
-                                                    cadenceMode = rf.cadenceMode,
-                                                    customSpm = rf.customSpm
-                                                )
-                                                checkNotificationPermission()
-                                                RouteSimulationService.startService(context)
-                                                isRunning = true
-                                                Toast.makeText(context, "已启动巡航: ${rf.name}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        ) {
-                                            Icon(Icons.Default.PlayArrow, contentDescription = "运行", tint = Color(0xFF006C5F))
-                                        }
-
-                                        // Delete Route button
-                                        IconButton(
-                                            onClick = {
-                                                scope.launch {
-                                                    val updated = favorites.filter { it.id != rf.id }
-                                                    repository.saveRouteFavorites(updated)
-                                                }
-                                            }
-                                        ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
+                                    Toast.makeText(context, "请先在地图上选定起点或跑道中心点", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                        }
-                    }
+                        },
+                        onStartRoute = { rf ->
+                            RouteSimulationService.engine.start(
+                                waypoints = rf.waypoints,
+                                travelMode = rf.travelMode,
+                                loopMode = rf.loopMode,
+                                speedMps = rf.speedMps,
+                                runMode = RouteRunMode.AUTOMATIC,
+                                cadenceMode = rf.cadenceMode,
+                                customSpm = rf.customSpm
+                            )
+                            checkNotificationPermission()
+                            RouteSimulationService.startService(context)
+                            isRunning = true
+                            Toast.makeText(context, "已启动巡航: ${rf.name}", Toast.LENGTH_SHORT).show()
+                        },
+                        onEditRoute = { rf ->
+                            editingRoute = rf
+                            editName = rf.name
+                            editSpeedMps = rf.speedMps
+                            editLoopMode = rf.loopMode
+                            editCadenceMode = rf.cadenceMode
+                            editCustomSpm = rf.customSpm
+                        },
+                        onDeleteRoute = { rf ->
+                            scope.launch {
+                                val updated = favorites.filter { it.id != rf.id }
+                                repository.saveRouteFavorites(updated)
+                            }
+                        },
+                        onGoToMap = { navController.popBackStack() }
+                    )
                 }
+                1 -> MotionRecordTab(onSessionSaved = { selectedTab = 2 })
+                2 -> MotionReplayTab()
+                3 -> MotionEvaluationTab()
             }
         }
     }
@@ -391,5 +294,148 @@ fun RouteSimulationScreen(navController: NavController) {
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun RouteManagementTab(
+    favorites: List<RouteFavorite>,
+    isRunning: Boolean,
+    engineState: RouteSimulationState,
+    onToggleSimulation: () -> Unit,
+    onStartRoute: (RouteFavorite) -> Unit,
+    onEditRoute: (RouteFavorite) -> Unit,
+    onDeleteRoute: (RouteFavorite) -> Unit,
+    onGoToMap: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Real-time Simulation Status Card
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isRunning) Color(0xFFE8F5E9) else Color(0xFFF7FDFD))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (isRunning) "路线模拟运行中 (巡航推进)" else "路线模拟已停止",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isRunning) Color(0xFF1B5E20) else Color(0xFF334155)
+                        )
+                        val speedStr = "%.1f".format(engineState.speedMetersPerSecond)
+                        Text(
+                            text = "速度: $speedStr m/s (${(engineState.speedMetersPerSecond * 3.6).roundToInt()} km/h)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    Button(
+                        onClick = onToggleSimulation,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isRunning) MaterialTheme.colorScheme.error else Color(0xFF006C5F)
+                        )
+                    ) {
+                        Icon(if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isRunning) "停止模拟" else "标准跑道巡航")
+                    }
+                }
+
+                if (isRunning) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        color = Color(0xFF81C784).copy(alpha = 0.5f)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("已巡航: ${"%.1f".format(engineState.traveledMeters)} 米", style = MaterialTheme.typography.labelMedium)
+                        Text("当前步频: ${engineState.currentSpm} SPM", style = MaterialTheme.typography.labelMedium, color = Color(0xFF006C5F))
+                        Text("已走步数: ${engineState.currentStepCount} 步", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("已收藏路线 (${favorites.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            TextButton(onClick = onGoToMap) {
+                Icon(Icons.Default.AddLocationAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("前往地图规划路线")
+            }
+        }
+
+        if (favorites.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                Text("暂无收藏路线。前往地图主界面可自由打点、手绘或自动生成路线！", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+                items(favorites, key = { it.id }) { rf ->
+                    val geoPoints = rf.waypoints.map { GeoPoint(it.latitude, it.longitude) }
+                    val distMeters = RoutePlanner.computeTotalDistanceMeters(geoPoints)
+                    val estSteps = RoutePlanner.estimateSteps(distMeters, rf.speedMps)
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(rf.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "航点: ${rf.waypoints.size} 个 | 里程: ${"%.2f".format(distMeters / 1000.0)} km | 预计: $estSteps 步",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF52615E)
+                                    )
+                                    Text(
+                                        "速度: ${"%.1f".format(rf.speedMps)} m/s (${(rf.speedMps * 3.6).roundToInt()} km/h) | 循环: ${rf.loopMode.name} | 步频: ${rf.cadenceMode.name}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF006C5F)
+                                    )
+                                }
+
+                                Row {
+                                    IconButton(onClick = { onEditRoute(rf) }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color(0xFF006C5F))
+                                    }
+
+                                    IconButton(onClick = { onStartRoute(rf) }) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "运行", tint = Color(0xFF006C5F))
+                                    }
+
+                                    IconButton(onClick = { onDeleteRoute(rf) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

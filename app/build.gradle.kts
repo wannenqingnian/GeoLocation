@@ -12,7 +12,7 @@ plugins {
 
 // Version is derived from the release tag in CI (passed via -PappVersionName=vX.Y.Z or the
 // APP_VERSION_NAME env var). Local builds fall back to the dev version below.
-val fallbackVersionName = "2.2.6"
+val fallbackVersionName = "2.2.7"
 
 fun resolveVersionName(): String {
     val provided = (project.findProperty("appVersionName") as String?)
@@ -90,6 +90,12 @@ android {
         }
 
     }
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -156,4 +162,9 @@ dependencies {
 
     compileOnly(libs.libxposed.api)
     implementation(libs.libxposed.service)
+}
+
+tasks.withType<Test> {
+    systemProperty("file.encoding", "UTF-8")
+    jvmArgs("-Dfile.encoding=UTF-8")
 }
