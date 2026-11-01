@@ -31,6 +31,20 @@ sealed class LoadingState {
     object Loaded : LoadingState()
 }
 
+enum class RouteDrawMode {
+    POINT_TAP, // 选点绘制路径
+    FREEHAND   // 手动画图绘制路径
+}
+
+data class TrackPreviewState(
+    val isPreviewing: Boolean = false,
+    val centerLat: Double = 0.0,
+    val centerLon: Double = 0.0,
+    val circumferenceMeters: Double = 400.0,
+    val rotationDegrees: Float = 0f,
+    val clockwise: Boolean = true
+)
+
 data class PlaceSearchResult(
     val name: String,
     val address: String,
@@ -108,7 +122,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val routeCustomSpm: Int = 165,
         val routeDistanceMeters: Double = 0.0,
         val routeEstimatedSteps: Long = 0L,
-        val isRouteSimulating: Boolean = false
+        val isRouteSimulating: Boolean = false,
+        val routeDrawMode: RouteDrawMode = RouteDrawMode.POINT_TAP,
+        val trackPreviewState: TrackPreviewState = TrackPreviewState(),
+        val previewWaypoints: List<io.github.ceigt.geolocation.data.model.route.RouteWaypoint> = emptyList()
     ) {
         val isFabClickable: Boolean
             get() = lastClickedLocation != null
@@ -309,6 +326,114 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val generated = io.github.ceigt.geolocation.manager.route.RoutePlanner.autoGenerateRoute(start, destination)
         _uiState.update { it.copy(plannedWaypoints = generated) }
         recalculateRouteStats()
+    }
+
+    fun setRouteDrawMode(mode: RouteDrawMode) {
+        _uiState.update { it.copy(routeDrawMode = mode) }
+    }
+
+    fun startTrackPreview() {
+        val cur = _uiState.value.lastClickedLocation
+            ?: _uiState.value.plannedWaypoints.firstOrNull()?.let { GeoPoint(it.latitude, it.longitude) }
+            ?: GeoPoint(39.9042, 116.4074)
+        val preview = TrackPreviewState(
+            isPreviewing = true,
+            centerLat = cur.latitude,
+            centerLon = cur.longitude,
+            circumferenceMeters = 400.0,
+            rotationDegrees = 0f,
+            clockwise = true
+        )
+        val waypoints = io.github.ceigt.geolocation.manager.route.TrackGenerator.generateStadiumTrack(
+            io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(
+                centerLat = preview.centerLat,
+                centerLon = preview.centerLon,
+                circumferenceMeters = preview.circumferenceMeters,
+                rotationDegrees = preview.rotationDegrees,
+                clockwise = preview.clockwise,
+                startAtSelectedPoint = true
+            )
+        )
+        _uiState.update {
+            it.copy(
+                trackPreviewState = preview,
+                previewWaypoints = waypoints
+            )
+        }
+    }
+
+    fun updateTrackPreview(
+        circumferenceMeters: Double? = null,
+        rotationDegrees: Float? = null,
+        clockwise: Boolean? = null,
+        center: GeoPoint? = null
+    ) {
+        _uiState.update { state ->
+            val cur = state.trackPreviewState
+            val updated = cur.copy(
+                centerLat = center?.latitude ?: cur.centerLat,
+                centerLon = center?.longitude ?: cur.centerLon,
+                circumferenceMeters = circumferenceMeters ?: cur.circumferenceMeters,
+                rotationDegrees = rotationDegrees ?: cur.rotationDegrees,
+                clockwise = clockwise ?: cur.clockwise
+            )
+            val waypoints = io.github.ceigt.geolocation.manager.route.TrackGenerator.generateStadiumTrack(
+                io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(
+                    centerLat = updated.centerLat,
+                    centerLon = updated.centerLon,
+                    circumferenceMeters = updated.circumferenceMeters,
+                    rotationDegrees = updated.rotationDegrees,
+                    clockwise = updated.clockwise,
+                    startAtSelectedPoint = true
+                )
+            )
+            state.copy(trackPreviewState = updated, previewWaypoints = waypoints)
+        }
+    }
+
+    fun moveTrackPreviewCenter(dMetersNorth: Double, dMetersEast: Double) {
+        _uiState.update { state ->
+            val cur = state.trackPreviewState
+            val dLat = dMetersNorth / 111320.0
+            val cosLat = kotlin.math.cos(Math.toRadians(cur.centerLat)).coerceAtLeast(0.1)
+            val dLon = dMetersEast / (111320.0 * cosLat)
+            val newLat = (cur.centerLat + dLat).coerceIn(-90.0, 90.0)
+            val newLon = ((cur.centerLon + dLon + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
+            val updated = cur.copy(centerLat = newLat, centerLon = newLon)
+            val waypoints = io.github.ceigt.geolocation.manager.route.TrackGenerator.generateStadiumTrack(
+                io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(
+                    centerLat = updated.centerLat,
+                    centerLon = updated.centerLon,
+                    circumferenceMeters = updated.circumferenceMeters,
+                    rotationDegrees = updated.rotationDegrees,
+                    clockwise = updated.clockwise,
+                    startAtSelectedPoint = true
+                )
+            )
+            state.copy(trackPreviewState = updated, previewWaypoints = waypoints)
+        }
+    }
+
+    fun confirmTrackPreview() {
+        _uiState.update { state ->
+            if (state.previewWaypoints.isNotEmpty()) {
+                state.copy(
+                    plannedWaypoints = state.previewWaypoints,
+                    previewWaypoints = emptyList(),
+                    trackPreviewState = state.trackPreviewState.copy(isPreviewing = false)
+                )
+            } else state
+        }
+        recalculateRouteStats()
+    }
+
+    fun cancelTrackPreview() {
+        _uiState.update {
+            it.copy(
+                previewWaypoints = emptyList(),
+                trackPreviewState = it.trackPreviewState.copy(isPreviewing = false)
+            )
+        }
     }
 
     fun applyHandDrawnPoints(points: List<GeoPoint>) {

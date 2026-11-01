@@ -68,8 +68,13 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
                 override fun singleTapConfirmedHelper(point: OsmPoint): Boolean {
                     interaction()
                     val wgs = tileServer.toWgs84(GeoPoint(point.latitude, point.longitude))
-                    if (model.uiState.value.isRoutePlanningMode) {
-                        model.addRouteWaypoint(wgs)
+                    val curState = model.uiState.value
+                    if (curState.trackPreviewState.isPreviewing) {
+                        model.updateTrackPreview(center = wgs)
+                    } else if (curState.isRoutePlanningMode) {
+                        if (curState.routeDrawMode == io.github.ceigt.geolocation.manager.ui.map.RouteDrawMode.POINT_TAP) {
+                            model.addRouteWaypoint(wgs)
+                        }
                     } else if (!playing) {
                         model.updateClickedLocation(wgs)
                     }
@@ -106,6 +111,74 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             outlinePaint.strokeWidth = 10f
             outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
             outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+        }
+    }
+    val trackPreviewPolyline = remember(map) {
+        org.osmdroid.views.overlay.Polyline(map).apply {
+            outlinePaint.color = android.graphics.Color.parseColor("#E65100") // High-contrast orange
+            outlinePaint.strokeWidth = 12f
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+        }
+    }
+    val freehandOverlay = remember(map) {
+        object : org.osmdroid.views.overlay.Overlay() {
+            private val screenPoints = mutableListOf<android.graphics.PointF>()
+            private val strokePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.parseColor("#00897B")
+                strokeWidth = 10f
+                style = android.graphics.Paint.Style.STROKE
+                strokeCap = android.graphics.Paint.Cap.ROUND
+                strokeJoin = android.graphics.Paint.Join.ROUND
+                isAntiAlias = true
+            }
+
+            override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
+                if (shadow || screenPoints.size < 2) return
+                val path = android.graphics.Path()
+                path.moveTo(screenPoints[0].x, screenPoints[0].y)
+                for (i in 1 until screenPoints.size) {
+                    path.lineTo(screenPoints[i].x, screenPoints[i].y)
+                }
+                canvas.drawPath(path, strokePaint)
+            }
+
+            override fun onTouchEvent(event: android.view.MotionEvent, mapView: MapView): Boolean {
+                val s = model.uiState.value
+                val isFreehandActive = s.isRoutePlanningMode &&
+                        s.routeDrawMode == io.github.ceigt.geolocation.manager.ui.map.RouteDrawMode.FREEHAND &&
+                        !s.trackPreviewState.isPreviewing
+                if (!isFreehandActive) return false
+
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        screenPoints.clear()
+                        screenPoints.add(android.graphics.PointF(event.x, event.y))
+                        mapView.invalidate()
+                        return true
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        screenPoints.add(android.graphics.PointF(event.x, event.y))
+                        mapView.invalidate()
+                        return true
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        if (screenPoints.size >= 2) {
+                            val geoPoints = screenPoints.map { pt ->
+                                val p = mapView.projection.fromPixels(pt.x.toInt(), pt.y.toInt()) as OsmPoint
+                                tileServer.toWgs84(GeoPoint(p.latitude, p.longitude))
+                            }
+                            model.applyHandDrawnPoints(geoPoints)
+                        }
+                        screenPoints.clear()
+                        mapView.invalidate()
+                        return true
+                    }
+                }
+                return false
+            }
+        }.also {
+            map.overlays.add(it)
         }
     }
     val unavailable = stringResource(R.string.toast_user_location_not_available)
@@ -178,6 +251,22 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             routePolyline.setPoints(osmPoints)
             if (!map.overlays.contains(routePolyline)) {
                 map.overlays.add(routePolyline)
+            }
+        }
+        map.invalidate()
+    }
+    LaunchedEffect(map, state.previewWaypoints) {
+        val pwps = state.previewWaypoints
+        if (pwps.isEmpty()) {
+            map.overlays.remove(trackPreviewPolyline)
+        } else {
+            val osmPoints = pwps.map {
+                val disp = tileServer.fromWgs84(GeoPoint(it.latitude, it.longitude))
+                OsmPoint(disp.latitude, disp.longitude)
+            }
+            trackPreviewPolyline.setPoints(osmPoints)
+            if (!map.overlays.contains(trackPreviewPolyline)) {
+                map.overlays.add(trackPreviewPolyline)
             }
         }
         map.invalidate()
