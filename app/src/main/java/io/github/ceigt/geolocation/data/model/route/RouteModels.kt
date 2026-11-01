@@ -58,6 +58,15 @@ data class RouteWaypoint(
     val stopDurationSeconds: Int = 0
 )
 
+data class RouteStepResult(
+    val latitude: Double,
+    val longitude: Double,
+    val speedMps: Float,
+    val bearingDegrees: Float,
+    val stepCount: Long = 0L,
+    val currentSpm: Int = 0
+)
+
 data class RouteSimulationState(
     val isActive: Boolean = false,
     val isPaused: Boolean = false,
@@ -73,15 +82,22 @@ data class RouteSimulationState(
     val smoothStartStopEnabled: Boolean = true,
     val cornerDecelerationMode: RouteCornerDecelerationMode = RouteCornerDecelerationMode.COMFORT,
     val manualBearingDegrees: Float = 0f,
-    val manualIntensity: Float = 0f
+    val manualIntensity: Float = 0f,
+    val cadenceMode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+    val customSpm: Int = 165,
+    val currentStepCount: Long = 0L,
+    val currentSpm: Int = 0
 )
 
 data class RouteFavorite(
     val id: String = java.util.UUID.randomUUID().toString(),
-    val name: String,
+    var name: String,
     val waypoints: List<RouteWaypoint>,
     val loopMode: RouteLoopMode = RouteLoopMode.CYCLE,
     val travelMode: RouteTravelMode = RouteTravelMode.WALKING,
+    val speedMps: Double = travelMode.defaultSpeedMps,
+    val cadenceMode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+    val customSpm: Int = 165,
     val createdAtEpochMillis: Long = System.currentTimeMillis()
 )
 

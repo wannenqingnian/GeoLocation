@@ -41,12 +41,15 @@ class RouteSimulationEngine {
         waypoints: List<RouteWaypoint>,
         travelMode: RouteTravelMode = RouteTravelMode.WALKING,
         loopMode: RouteLoopMode = RouteLoopMode.CYCLE,
+        speedMps: Double = travelMode.defaultSpeedMps,
         cornerDecel: RouteCornerDecelerationMode = RouteCornerDecelerationMode.COMFORT,
-        runMode: RouteRunMode = RouteRunMode.AUTOMATIC
+        runMode: RouteRunMode = RouteRunMode.AUTOMATIC,
+        cadenceMode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+        customSpm: Int = 165
     ) {
         if (waypoints.isEmpty()) return
         val path = waypoints.map { GeoPoint(it.latitude, it.longitude) }
-        precomputePath(path, waypoints, travelMode.defaultSpeedMps, cornerDecel)
+        precomputePath(path, waypoints, speedMps, cornerDecel)
 
         state = RouteSimulationState(
             isActive = true,
@@ -54,11 +57,15 @@ class RouteSimulationEngine {
             points = waypoints,
             plannedPath = path,
             traveledMeters = 0.0,
-            speedMetersPerSecond = travelMode.defaultSpeedMps,
+            speedMetersPerSecond = speedMps,
             travelMode = travelMode,
             loopMode = loopMode,
             runMode = runMode,
-            cornerDecelerationMode = cornerDecel
+            cornerDecelerationMode = cornerDecel,
+            cadenceMode = cadenceMode,
+            customSpm = customSpm,
+            currentStepCount = 0L,
+            currentSpm = 0
         )
         lastUpdateNanos = SystemClock.elapsedRealtimeNanos()
         currentPhase = RouteMotionPhase.ACCELERATING
@@ -106,7 +113,7 @@ class RouteSimulationEngine {
 
     private fun stepManual(dt: Double): RouteStepResult {
         val currentPoint = state.plannedPath.firstOrNull() ?: GeoPoint(0.0, 0.0)
-        val maxSpeed = state.travelMode.defaultSpeedMps
+        val maxSpeed = state.speedMetersPerSecond
         val currentSpeed = maxSpeed * state.manualIntensity
         val distanceDelta = currentSpeed * dt
 
@@ -123,17 +130,32 @@ class RouteSimulationEngine {
             ((currentPoint.longitude + deltaLon + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
         )
 
+        val strideLength = (0.7 + 0.15 * currentSpeed).coerceIn(0.5, 1.4)
+        val deltaSteps = if (currentSpeed > 0.2) (distanceDelta / strideLength) else 0.0
+        val newStepCount = state.currentStepCount + deltaSteps.toLong()
+        val currentSpm = if (currentSpeed > 0.2) {
+            if (state.cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
+                state.customSpm
+            } else {
+                (90 + (currentSpeed * 35).roundToInt()).coerceIn(90, 205)
+            }
+        } else 0
+
         state = state.copy(
             plannedPath = listOf(newPoint),
             traveledMeters = state.traveledMeters + distanceDelta,
-            speedMetersPerSecond = currentSpeed
+            speedMetersPerSecond = currentSpeed,
+            currentStepCount = newStepCount,
+            currentSpm = currentSpm
         )
 
         return RouteStepResult(
             latitude = newPoint.latitude,
             longitude = newPoint.longitude,
             speedMps = currentSpeed.toFloat(),
-            bearingDegrees = state.manualBearingDegrees
+            bearingDegrees = state.manualBearingDegrees,
+            stepCount = newStepCount,
+            currentSpm = currentSpm
         )
     }
 
@@ -144,10 +166,17 @@ class RouteSimulationEngine {
         if (now < stopUntilNanos) {
             currentPhase = RouteMotionPhase.DECELERATING
             val cur = interpolatePosition(state.traveledMeters)
-            return RouteStepResult(cur.first.latitude, cur.first.longitude, 0f, cur.second.toFloat())
+            return RouteStepResult(
+                cur.first.latitude,
+                cur.first.longitude,
+                0f,
+                cur.second.toFloat(),
+                state.currentStepCount,
+                0
+            )
         }
 
-        var speed = state.travelMode.defaultSpeedMps
+        var speed = state.speedMetersPerSecond
         val currentDist = state.traveledMeters
 
         // 2. Check upcoming waypoint stop schedules
@@ -155,16 +184,21 @@ class RouteSimulationEngine {
             if (!schedule.executed) {
                 val distToStop = schedule.distanceMeters - currentDist
                 if (distToStop in 0.0..15.0) {
-                    // Start smooth braking
                     val decelRatio = (distToStop / 15.0).coerceIn(0.1, 1.0)
                     speed *= decelRatio
                 }
                 if (distToStop in -1.5..1.5) {
-                    // Dwell at waypoint
                     schedule.executed = true
                     stopUntilNanos = now + (schedule.durationMillis * 1_000_000L)
                     val cur = interpolatePosition(schedule.distanceMeters)
-                    return RouteStepResult(cur.first.latitude, cur.first.longitude, 0f, cur.second.toFloat())
+                    return RouteStepResult(
+                        cur.first.latitude,
+                        cur.first.longitude,
+                        0f,
+                        cur.second.toFloat(),
+                        state.currentStepCount,
+                        0
+                    )
                 }
             }
         }
@@ -180,14 +214,14 @@ class RouteSimulationEngine {
             }
         }
 
-        var newDist = state.traveledMeters + speed * dt * state.direction
+        val distanceDelta = speed * dt
+        var newDist = state.traveledMeters + distanceDelta * state.direction
 
         // 4. Loop handling
         if (newDist >= totalPathDistanceMeters) {
             when (state.loopMode) {
                 RouteLoopMode.CYCLE -> {
                     newDist %= totalPathDistanceMeters
-                    // Reset stop schedules for next cycle
                     stopSchedules.forEach { it.executed = false }
                 }
                 RouteLoopMode.BOUNCE -> {
@@ -210,9 +244,32 @@ class RouteSimulationEngine {
             }
         }
 
-        state = state.copy(traveledMeters = newDist, speedMetersPerSecond = speed)
+        val strideLength = (0.7 + 0.15 * speed).coerceIn(0.5, 1.4)
+        val deltaSteps = if (speed > 0.2) (distanceDelta / strideLength) else 0.0
+        val newStepCount = state.currentStepCount + deltaSteps.toLong()
+        val currentSpm = if (speed > 0.2) {
+            if (state.cadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
+                state.customSpm
+            } else {
+                (90 + (speed * 35).roundToInt()).coerceIn(90, 205)
+            }
+        } else 0
+
+        state = state.copy(
+            traveledMeters = newDist,
+            speedMetersPerSecond = speed,
+            currentStepCount = newStepCount,
+            currentSpm = currentSpm
+        )
         val (point, bearing) = interpolatePosition(newDist)
-        return RouteStepResult(point.latitude, point.longitude, speed.toFloat(), bearing.toFloat())
+        return RouteStepResult(
+            point.latitude,
+            point.longitude,
+            speed.toFloat(),
+            bearing.toFloat(),
+            newStepCount,
+            currentSpm
+        )
     }
 
     private fun precomputePath(
@@ -321,10 +378,3 @@ class RouteSimulationEngine {
         return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
     }
 }
-
-data class RouteStepResult(
-    val latitude: Double,
-    val longitude: Double,
-    val speedMps: Float,
-    val bearingDegrees: Float
-)

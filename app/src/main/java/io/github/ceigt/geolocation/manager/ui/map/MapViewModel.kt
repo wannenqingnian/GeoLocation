@@ -98,6 +98,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val isSelectedLocationAddressLoading: Boolean = false,
         @StringRes val selectedLocationAddressMessageRes: Int? = null,
         val showMapQuotaDialog: Boolean = false,
+        // Route planning & creation states
+        val isRoutePlanningMode: Boolean = false,
+        val plannedWaypoints: List<io.github.ceigt.geolocation.data.model.route.RouteWaypoint> = emptyList(),
+        val routeTravelMode: io.github.ceigt.geolocation.data.model.route.RouteTravelMode = io.github.ceigt.geolocation.data.model.route.RouteTravelMode.WALKING,
+        val routeLoopMode: io.github.ceigt.geolocation.data.model.route.RouteLoopMode = io.github.ceigt.geolocation.data.model.route.RouteLoopMode.CYCLE,
+        val routeSpeedMps: Double = 1.4,
+        val routeCadenceMode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+        val routeCustomSpm: Int = 165,
+        val routeDistanceMeters: Double = 0.0,
+        val routeEstimatedSteps: Long = 0L,
+        val isRouteSimulating: Boolean = false
     ) {
         val isFabClickable: Boolean
             get() = lastClickedLocation != null
@@ -242,6 +253,160 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update { it.copy(addToFavoritesState = updatedState) }
     }
+
+    // region Route Planning & Simulation
+    fun toggleRoutePlanningMode() {
+        _uiState.update { current ->
+            val next = !current.isRoutePlanningMode
+            current.copy(
+                isRoutePlanningMode = next,
+                // Prefill first waypoint with current selected location if empty
+                plannedWaypoints = if (next && current.plannedWaypoints.isEmpty() && current.lastClickedLocation != null) {
+                    listOf(
+                        io.github.ceigt.geolocation.data.model.route.RouteWaypoint(
+                            name = "起点",
+                            latitude = current.lastClickedLocation.latitude,
+                            longitude = current.lastClickedLocation.longitude
+                        )
+                    )
+                } else current.plannedWaypoints
+            )
+        }
+        recalculateRouteStats()
+    }
+
+    fun addRouteWaypoint(point: GeoPoint) {
+        _uiState.update { current ->
+            val index = current.plannedWaypoints.size + 1
+            val name = if (index == 1) "起点" else "途经点 $index"
+            val newWp = io.github.ceigt.geolocation.data.model.route.RouteWaypoint(
+                name = name,
+                latitude = point.latitude,
+                longitude = point.longitude
+            )
+            current.copy(plannedWaypoints = current.plannedWaypoints + newWp)
+        }
+        recalculateRouteStats()
+    }
+
+    fun removeLastRouteWaypoint() {
+        _uiState.update { current ->
+            if (current.plannedWaypoints.isNotEmpty()) {
+                current.copy(plannedWaypoints = current.plannedWaypoints.dropLast(1))
+            } else current
+        }
+        recalculateRouteStats()
+    }
+
+    fun clearRouteWaypoints() {
+        _uiState.update { it.copy(plannedWaypoints = emptyList()) }
+        recalculateRouteStats()
+    }
+
+    fun autoGenerateRouteTo(destination: GeoPoint) {
+        val start = _uiState.value.plannedWaypoints.lastOrNull()?.let { GeoPoint(it.latitude, it.longitude) }
+            ?: _uiState.value.lastClickedLocation ?: return
+        val generated = io.github.ceigt.geolocation.manager.route.RoutePlanner.autoGenerateRoute(start, destination)
+        _uiState.update { it.copy(plannedWaypoints = generated) }
+        recalculateRouteStats()
+    }
+
+    fun applyHandDrawnPoints(points: List<GeoPoint>) {
+        val simplified = io.github.ceigt.geolocation.manager.route.RoutePlanner.simplifyHandDrawnTrack(points)
+        if (simplified.isNotEmpty()) {
+            _uiState.update { it.copy(plannedWaypoints = simplified) }
+            recalculateRouteStats()
+        }
+    }
+
+    fun setRouteTravelMode(mode: io.github.ceigt.geolocation.data.model.route.RouteTravelMode) {
+        _uiState.update { it.copy(routeTravelMode = mode, routeSpeedMps = mode.defaultSpeedMps) }
+        recalculateRouteStats()
+    }
+
+    fun setRouteLoopMode(mode: io.github.ceigt.geolocation.data.model.route.RouteLoopMode) {
+        _uiState.update { it.copy(routeLoopMode = mode) }
+    }
+
+    fun setRouteSpeedMps(speed: Double) {
+        _uiState.update { it.copy(routeSpeedMps = speed.coerceIn(0.5, 35.0)) }
+        recalculateRouteStats()
+    }
+
+    fun setRouteCadence(mode: io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode, spm: Int) {
+        _uiState.update { it.copy(routeCadenceMode = mode, routeCustomSpm = spm) }
+    }
+
+    private fun recalculateRouteStats() {
+        _uiState.update { state ->
+            val wps = state.plannedWaypoints
+            if (wps.size < 2) {
+                state.copy(routeDistanceMeters = 0.0, routeEstimatedSteps = 0L)
+            } else {
+                val geoPoints = wps.map { GeoPoint(it.latitude, it.longitude) }
+                val dist = io.github.ceigt.geolocation.manager.route.RoutePlanner.computeTotalDistanceMeters(geoPoints)
+                val steps = io.github.ceigt.geolocation.manager.route.RoutePlanner.estimateSteps(dist, state.routeSpeedMps)
+                state.copy(routeDistanceMeters = dist, routeEstimatedSteps = steps)
+            }
+        }
+    }
+
+    fun saveCurrentRouteFavorite(name: String, onDone: () -> Unit = {}) {
+        val state = _uiState.value
+        if (state.plannedWaypoints.size < 2) return
+        val fav = io.github.ceigt.geolocation.data.model.route.RouteFavorite(
+            name = name.ifBlank { "路线规划-${System.currentTimeMillis() % 10000}" },
+            waypoints = state.plannedWaypoints,
+            loopMode = state.routeLoopMode,
+            travelMode = state.routeTravelMode,
+            speedMps = state.routeSpeedMps,
+            cadenceMode = state.routeCadenceMode,
+            customSpm = state.routeCustomSpm
+        )
+        writer.enqueue {
+            val list = preferencesRepository.getRouteFavorites().toMutableList()
+            list.add(fav)
+            preferencesRepository.saveRouteFavorites(list)
+        }
+        onDone()
+    }
+
+    fun loadFavoriteRoute(fav: io.github.ceigt.geolocation.data.model.route.RouteFavorite) {
+        _uiState.update {
+            it.copy(
+                isRoutePlanningMode = true,
+                plannedWaypoints = fav.waypoints,
+                routeLoopMode = fav.loopMode,
+                routeTravelMode = fav.travelMode,
+                routeSpeedMps = fav.speedMps,
+                routeCadenceMode = fav.cadenceMode,
+                routeCustomSpm = fav.customSpm
+            )
+        }
+        recalculateRouteStats()
+    }
+
+    fun startSimulatingRoute(context: android.content.Context) {
+        val state = _uiState.value
+        if (state.plannedWaypoints.size < 2) return
+        io.github.ceigt.geolocation.manager.route.RouteSimulationService.engine.start(
+            waypoints = state.plannedWaypoints,
+            travelMode = state.routeTravelMode,
+            loopMode = state.routeLoopMode,
+            speedMps = state.routeSpeedMps,
+            runMode = io.github.ceigt.geolocation.data.model.route.RouteRunMode.AUTOMATIC,
+            cadenceMode = state.routeCadenceMode,
+            customSpm = state.routeCustomSpm
+        )
+        io.github.ceigt.geolocation.manager.route.RouteSimulationService.startService(context)
+        _uiState.update { it.copy(isRouteSimulating = true) }
+    }
+
+    fun stopSimulatingRoute(context: android.content.Context) {
+        io.github.ceigt.geolocation.manager.route.RouteSimulationService.stopService(context)
+        _uiState.update { it.copy(isRouteSimulating = false) }
+    }
+    // endregion
 
     // Go to point logic
     fun goToPoint(latitude: Double, longitude: Double) {

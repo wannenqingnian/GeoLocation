@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -61,7 +62,19 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Close
 import io.github.ceigt.geolocation.manager.ui.navigation.Screen
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
@@ -189,6 +202,8 @@ fun MapScreen(
     var showSponsorSheet by remember { mutableStateOf(false) }
     var showTargetAppsSheet by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var showSaveRouteDialog by remember { mutableStateOf(false) }
+    var saveRouteName by remember { mutableStateOf("") }
     val hasMapModal =
         showAddToFavoritesDialog || showAboutDialog || showSponsorSheet || showTargetAppsSheet ||
             showSettingsSheet || uiState.showMapQuotaDialog || favoritePendingDeletion != null
@@ -313,51 +328,64 @@ fun MapScreen(
                             .padding(start = 18.dp, top = 72.dp, end = 18.dp)
                     )
                 }
-                if (uiState.placeSearchResults.isEmpty() && uiState.placeSearchErrorMessageRes == null) {
-                    MapLocationInfo(
-                        lastClickedLocation = uiState.lastClickedLocation,
-                        selectedLocationAddress = uiState.selectedLocationAddress,
-                        selectedLocationPoiTitle = uiState.selectedLocationPoiTitle,
-                        isAddressLoading = uiState.isSelectedLocationAddressLoading,
-                        addressMessageRes = uiState.selectedLocationAddressMessageRes,
-                        isPlaying = isPlaying,
+                if (uiState.isRoutePlanningMode) {
+                    RoutePlanningPanel(
+                        uiState = uiState,
+                        mapViewModel = mapViewModel,
+                        onSaveRoute = { showSaveRouteDialog = true },
+                        onOpenRouteLibrary = { navController?.navigate(Screen.Route.route) },
                         modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(start = 24.dp, end = 24.dp, bottom = 164.dp)
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
                     )
-                }
-                if (!hasMapModal) {
-                val rootRunning = locationMode == LocationMode.ROOT_MODE && isPlaying
-                val displayStatus = if (rootRunning) "Root 模式: 运行中 (系统底层注入)" else uiState.hookStatus
-                displayStatus?.let { status ->
-                    Text(status, modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(start = 16.dp, end = 16.dp, bottom = 154.dp)
-                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(8.dp))
-                        .padding(6.dp), fontSize = 12.sp, color = Color(0xFF334155))
-                }
-                MapPlayButton(
-                    isPlaying = isPlaying,
-                    isStarting = uiState.isStarting,
-                    enabled = isFabClickable,
-                    onClick = {
-                        dismissSearch()
-                        val wasPlaying = uiState.isPlaying || uiState.isStarting
-                        if (!wasPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    if (uiState.placeSearchResults.isEmpty() && uiState.placeSearchErrorMessageRes == null) {
+                        MapLocationInfo(
+                            lastClickedLocation = uiState.lastClickedLocation,
+                            selectedLocationAddress = uiState.selectedLocationAddress,
+                            selectedLocationPoiTitle = uiState.selectedLocationPoiTitle,
+                            isAddressLoading = uiState.isSelectedLocationAddressLoading,
+                            addressMessageRes = uiState.selectedLocationAddressMessageRes,
+                            isPlaying = isPlaying,
+                            modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(start = 24.dp, end = 24.dp, bottom = 164.dp)
+                        )
+                    }
+                    if (!hasMapModal) {
+                    val rootRunning = locationMode == LocationMode.ROOT_MODE && isPlaying
+                    val displayStatus = if (rootRunning) "Root 模式: 运行中 (系统底层注入)" else uiState.hookStatus
+                    displayStatus?.let { status ->
+                        Text(status, modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(start = 16.dp, end = 16.dp, bottom = 154.dp)
+                            .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(8.dp))
+                            .padding(6.dp), fontSize = 12.sp, color = Color(0xFF334155))
+                    }
+                    MapPlayButton(
+                        isPlaying = isPlaying,
+                        isStarting = uiState.isStarting,
+                        enabled = isFabClickable,
+                        onClick = {
+                            dismissSearch()
+                            val wasPlaying = uiState.isPlaying || uiState.isStarting
+                            if (!wasPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
                             }
-                        }
-                        mapViewModel.togglePlaying()
-                        if (locationMode != LocationMode.MOCK_PROVIDER || wasPlaying) scope.launch {
-                            snackbarHostState.showSnackbar(
-                                if (!wasPlaying) context.getString(R.string.simulation_request_submitted) else fakeLocationUnset
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 30.dp)
-                )
+                            mapViewModel.togglePlaying()
+                            if (locationMode != LocationMode.MOCK_PROVIDER || wasPlaying) scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (!wasPlaying) context.getString(R.string.simulation_request_submitted) else fakeLocationUnset
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 30.dp)
+                    )
+                    }
+                }
                 MapTargetAppsButton(
                     onClick = { showTargetAppsSheet = true },
                     modifier = Modifier
@@ -407,24 +435,25 @@ fun MapScreen(
                 }
 
                 // Route Simulation Manager Quick Button
+                val isPlanning = uiState.isRoutePlanningMode
                 Surface(
                     shape = CircleShape,
-                    color = Color.White,
-                    contentColor = Color(0xFF006C5F),
+                    color = if (isPlanning) Color(0xFF006C5F) else Color.White,
+                    contentColor = if (isPlanning) Color.White else Color(0xFF006C5F),
                     shadowElevation = 6.dp,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 42.dp, bottom = 120.dp)
                         .size(46.dp)
                         .clickable {
-                            navController?.navigate(Screen.Route.route)
+                            mapViewModel.toggleRoutePlanningMode()
                         }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Timeline,
                             contentDescription = "路线规划与跑道模拟",
-                            tint = Color(0xFF006C5F),
+                            tint = if (isPlanning) Color.White else Color(0xFF006C5F),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -501,7 +530,6 @@ fun MapScreen(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                }
                 }
                 if (mapProvider == MapProvider.OSMDROID) {
                     Text(
@@ -581,6 +609,38 @@ fun MapScreen(
             onOpenMapService = {
                 mapViewModel.dismissMapQuotaDialog()
                 showSettingsSheet = true
+            }
+        )
+    }
+    if (showSaveRouteDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveRouteDialog = false },
+            title = { Text("收藏当前规划路线", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = saveRouteName,
+                    onValueChange = { saveRouteName = it },
+                    label = { Text("路线名称") },
+                    placeholder = { Text("例: 晨跑操场路线") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    mapViewModel.saveCurrentRouteFavorite(saveRouteName) {
+                        scope.launch { snackbarHostState.showSnackbar("路线「$saveRouteName」已成功收藏！") }
+                    }
+                    showSaveRouteDialog = false
+                    saveRouteName = ""
+                }) {
+                    Text("收藏保存")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveRouteDialog = false }) {
+                    Text("取消")
+                }
             }
         )
     }
@@ -1752,4 +1812,245 @@ private fun MapStatusPanel(
 private fun String.toAddressLeafLabel(): String {
     val trimmed = trim()
     return trimmed.substringAfterLast(" · ").trim().ifBlank { trimmed }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RoutePlanningPanel(
+    uiState: MapViewModel.MapUiState,
+    mapViewModel: MapViewModel,
+    onSaveRoute: () -> Unit,
+    onOpenRouteLibrary: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xF7FFFFFF),
+        shadowElevation = 12.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCE8E4))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Timeline, contentDescription = null, tint = Color(0xFF006C5F), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "路线规划模式 (已选 ${uiState.plannedWaypoints.size} 航点)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E3A37)
+                    )
+                }
+                IconButton(onClick = { mapViewModel.toggleRoutePlanningMode() }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "退出规划", tint = Color(0xFF55717C))
+                }
+            }
+
+            // Route metrics
+            val distKm = "%.2f".format(uiState.routeDistanceMeters / 1000.0)
+            val durationMin = ((uiState.routeDistanceMeters / uiState.routeSpeedMps.coerceAtLeast(0.5)) / 60.0).roundToInt()
+            Text(
+                text = "总里程: $distKm km | 预计用时: $durationMin 分钟 | 预估步数: ${uiState.routeEstimatedSteps} 步",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF006C5F),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+            )
+
+            // Tool buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { mapViewModel.removeLastRouteWaypoint() },
+                    enabled = uiState.plannedWaypoints.isNotEmpty(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("撤销", style = MaterialTheme.typography.labelSmall)
+                }
+
+                OutlinedButton(
+                    onClick = { mapViewModel.clearRouteWaypoints() },
+                    enabled = uiState.plannedWaypoints.isNotEmpty(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("清空", style = MaterialTheme.typography.labelSmall)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val cur = uiState.lastClickedLocation
+                        if (cur != null) {
+                            mapViewModel.autoGenerateRouteTo(cur)
+                        } else {
+                            Toast.makeText(context, "请先在地图选定目标终点", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(Icons.Default.AutoMode, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("自动规划", style = MaterialTheme.typography.labelSmall)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val cur = uiState.lastClickedLocation ?: uiState.plannedWaypoints.firstOrNull()?.let { GeoPoint(it.latitude, it.longitude) }
+                        if (cur != null) {
+                            val wps = io.github.ceigt.geolocation.manager.route.TrackGenerator.generateStadiumTrack(
+                                io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(cur.latitude, cur.longitude)
+                            )
+                            mapViewModel.clearRouteWaypoints()
+                            wps.forEach { mapViewModel.addRouteWaypoint(GeoPoint(it.latitude, it.longitude)) }
+                        } else {
+                            Toast.makeText(context, "请在地图上选定操场中心点", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(Icons.Default.DirectionsRun, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("操场跑道", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            // Speed & Cadence config
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "速度: ${"%.1f".format(uiState.routeSpeedMps)} m/s (${(uiState.routeSpeedMps * 3.6).roundToInt()} km/h)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = uiState.routeLoopMode == io.github.ceigt.geolocation.data.model.route.RouteLoopMode.CYCLE,
+                        onClick = { mapViewModel.setRouteLoopMode(io.github.ceigt.geolocation.data.model.route.RouteLoopMode.CYCLE) },
+                        label = { Text("闭环", style = MaterialTheme.typography.labelSmall) }
+                    )
+                    FilterChip(
+                        selected = uiState.routeLoopMode == io.github.ceigt.geolocation.data.model.route.RouteLoopMode.BOUNCE,
+                        onClick = { mapViewModel.setRouteLoopMode(io.github.ceigt.geolocation.data.model.route.RouteLoopMode.BOUNCE) },
+                        label = { Text("折返", style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+            }
+
+            Slider(
+                value = uiState.routeSpeedMps.toFloat(),
+                onValueChange = { mapViewModel.setRouteSpeedMps(it.toDouble()) },
+                valueRange = 0.5f..20.0f,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+
+            // Cadence Mode row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("步频:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                FilterChip(
+                    selected = uiState.routeCadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO,
+                    onClick = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO, uiState.routeCustomSpm) },
+                    label = { Text("自适应", style = MaterialTheme.typography.labelSmall) }
+                )
+                FilterChip(
+                    selected = uiState.routeCadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM,
+                    onClick = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM, uiState.routeCustomSpm) },
+                    label = { Text("固定SPM", style = MaterialTheme.typography.labelSmall) }
+                )
+                FilterChip(
+                    selected = uiState.routeCadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF,
+                    onClick = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.OFF, uiState.routeCustomSpm) },
+                    label = { Text("关闭", style = MaterialTheme.typography.labelSmall) }
+                )
+            }
+
+            if (uiState.routeCadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("目标步频: ${uiState.routeCustomSpm} SPM", style = MaterialTheme.typography.labelSmall)
+                }
+                Slider(
+                    value = uiState.routeCustomSpm.toFloat(),
+                    onValueChange = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM, it.toInt()) },
+                    valueRange = 60f..220f,
+                    steps = 160
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Action buttons row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onSaveRoute,
+                    enabled = uiState.plannedWaypoints.size >= 2,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.BookmarkBorder, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("收藏", style = MaterialTheme.typography.labelMedium)
+                }
+
+                OutlinedButton(
+                    onClick = onOpenRouteLibrary,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("路线库", style = MaterialTheme.typography.labelMedium)
+                }
+
+                val isSimulating = uiState.isRouteSimulating || io.github.ceigt.geolocation.manager.route.RouteSimulationService.engine.state.isActive
+                Button(
+                    onClick = {
+                        if (isSimulating) {
+                            mapViewModel.stopSimulatingRoute(context)
+                        } else {
+                            if (uiState.plannedWaypoints.size >= 2) {
+                                mapViewModel.startSimulatingRoute(context)
+                            } else {
+                                Toast.makeText(context, "请在地图上至少规划 2 个航点", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSimulating) MaterialTheme.colorScheme.error else Color(0xFF006C5F)
+                    ),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(if (isSimulating) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isSimulating) "停止巡航" else "启动巡航", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
 }

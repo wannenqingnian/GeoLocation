@@ -23,6 +23,15 @@ import java.util.Random
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
 
+/**
+ * High-fidelity biomechanical multi-sensor cadence & movement simulation.
+ * Reconstructs realistic human walking/running gait cycles:
+ * - Heel-strike impact shock impulses (垂直触地冲击尖峰)
+ * - Push-off & center-of-mass vertical oscillation harmonics (重心双谐波起伏)
+ * - Lateral alternating sway for left/right legs (左右脚交替侧向微晃)
+ * - Natural biological timing jitter (步间微颤动)
+ * - Synchronous delivery to ACCELEROMETER, LINEAR_ACCELERATION, GRAVITY, STEP_COUNTER, STEP_DETECTOR
+ */
 class AccelerometerCadenceHooks(
     private val module: XposedInterface,
     private val classLoader: ClassLoader
@@ -40,11 +49,13 @@ class AccelerometerCadenceHooks(
 
     private val activeListeners = Collections.newSetFromMap(ConcurrentHashMap<SensorListenerEntry, Boolean>())
     @Volatile private var isLooping = false
-    @Volatile private var totalAccumulatedSteps = 1200L
+    @Volatile private var totalAccumulatedSteps = 1520L
     private var lastStepTimeNanos = 0L
+    private var currentStepPeriodNanos = 375_000_000L // ~160 SPM
 
-    // Waveform phase timer
-    private var waveStartTimeNanos = SystemClock.elapsedRealtimeNanos()
+    // Biomechanical phase accumulator (radians)
+    private var phaseRad = 0.0
+    private var lastTickNanos = SystemClock.elapsedRealtimeNanos()
 
     private val periodicWaveformRunnable = object : Runnable {
         override fun run() {
@@ -54,7 +65,7 @@ class AccelerometerCadenceHooks(
             }
 
             dispatchSyntheticSensorEvents()
-            mainHandler.postDelayed(this, 20L) // 50 Hz sensor sample rate
+            mainHandler.postDelayed(this, 20L) // 50 Hz sample rate
         }
     }
 
@@ -69,7 +80,7 @@ class AccelerometerCadenceHooks(
             if (systemSensorManagerClass != null) {
                 hookRegisterListener(systemSensorManagerClass)
             }
-            module.log(Log.INFO, tag, "AccelerometerCadenceHooks installed successfully")
+            module.log(Log.INFO, tag, "Biomechanical CadenceHooks installed successfully")
         }.onFailure {
             module.log(Log.INFO, tag, "Sensor hooks initialization failed: ${it.message}")
         }
@@ -89,7 +100,8 @@ class AccelerometerCadenceHooks(
                         if (type == Sensor.TYPE_ACCELEROMETER ||
                             type == Sensor.TYPE_STEP_COUNTER ||
                             type == Sensor.TYPE_STEP_DETECTOR ||
-                            type == 10 // TYPE_LINEAR_ACCELERATION
+                            type == Sensor.TYPE_LINEAR_ACCELERATION ||
+                            type == Sensor.TYPE_GRAVITY
                         ) {
                             activeListeners.add(SensorListenerEntry(listener, sensor, type))
                             startLoopIfNeeded()
@@ -116,7 +128,7 @@ class AccelerometerCadenceHooks(
     private fun startLoopIfNeeded() {
         if (!isLooping && PreferencesUtil.getIsPlaying()) {
             isLooping = true
-            waveStartTimeNanos = SystemClock.elapsedRealtimeNanos()
+            lastTickNanos = SystemClock.elapsedRealtimeNanos()
             mainHandler.post(periodicWaveformRunnable)
         }
     }
@@ -129,39 +141,75 @@ class AccelerometerCadenceHooks(
 
         if (cadenceConfig.mode == TargetCadenceMode.OFF) return
 
-        val customSpm = if (cadenceConfig.mode == TargetCadenceMode.CUSTOM) cadenceConfig.customStepsPerMinute else null
-        val spm = LocationUtil.computeCadenceStepsPerMinute(currentSpeed, enabled = true, customSpm = customSpm)
-        if (spm <= 0) return
-
         val nowNanos = SystemClock.elapsedRealtimeNanos()
-        val stepIntervalNanos = (60_000_000_000L / spm)
+        val dt = ((nowNanos - lastTickNanos).toDouble() / 1_000_000_000.0).coerceIn(0.005, 0.1)
+        lastTickNanos = nowNanos
 
+        // 1. Static / Stationary state (standing still, red light, or speed < 0.2 m/s)
+        if (currentSpeed < 0.2f) {
+            dispatchStationaryState(nowNanos)
+            return
+        }
+
+        // 2. Active Movement state: Compute realistic biological cadence (SPM)
+        val customSpm = if (cadenceConfig.mode == TargetCadenceMode.CUSTOM) cadenceConfig.customStepsPerMinute else null
+        val baseSpm = LocationUtil.computeCadenceStepsPerMinute(currentSpeed, enabled = true, customSpm = customSpm)
+        if (baseSpm <= 0) return
+
+        // Compute step frequency (Hz): each step is half a gait cycle (2 steps per full stride)
+        val fStep = baseSpm.toDouble() / 60.0
+        val dPhase = 2.0 * PI * fStep * dt
+        phaseRad = (phaseRad + dPhase) % (2.0 * PI)
+
+        // Step event check with 3.5% human biological jitter
         var hasNewStep = false
-        if (nowNanos - lastStepTimeNanos >= stepIntervalNanos) {
+        if (nowNanos - lastStepTimeNanos >= currentStepPeriodNanos) {
             lastStepTimeNanos = nowNanos
             totalAccumulatedSteps++
             hasNewStep = true
+            val jitterRatio = 1.0 + (random.nextGaussian() * 0.035).coerceIn(-0.08, 0.08)
+            currentStepPeriodNanos = ((60_000_000_000L / baseSpm) * jitterRatio).toLong()
         }
 
-        // Check if Accelerometer channel is enabled for this target
         val allowAccelerometer = cadenceConfig.channel == TargetCadenceChannel.ACCELEROMETER
 
-        // Compute 3D accelerometer oscillation: f = spm / 60.0 Hz
-        val f = spm.toDouble() / 60.0
-        val t = (nowNanos - waveStartTimeNanos).toDouble() / 1_000_000_000.0
+        // 3. Biomechanical 3D Accelerometer Waveform Synthesis
+        // Speed scaling factor:
+        val speedFactor = (currentSpeed / 2.5).coerceIn(0.6, 2.2)
 
-        val speedRatio = (currentSpeed / 4.0f).coerceIn(0.5f, 1.8f)
-        val axAmp = 2.5 * speedRatio
-        val ayAmp = 4.0 * speedRatio
-        val azAmp = 3.5 * speedRatio
+        // Phase within the current step (0 to PI)
+        val stepPhase = phaseRad % PI
+        val stepNormalized = stepPhase / PI // 0.0 .. 1.0 within step
 
-        // ax = Ax * sin(pi * f * t) + noise
-        val noiseRatio = 0.15
-        val ax = (axAmp * sin(PI * f * t) + random.nextGaussian() * noiseRatio).toFloat()
-        // ay = Ay * cos(2 * pi * f * t) + noise
-        val ay = (ayAmp * cos(2 * PI * f * t) + random.nextGaussian() * noiseRatio).toFloat()
-        // az = 9.81 + Az * sin(2 * pi * f * t) + noise
-        val az = (9.81 + azAmp * sin(2 * PI * f * t) + random.nextGaussian() * noiseRatio).toFloat()
+        // a. Heel-Strike Impact Spike (足后跟落地脉冲冲击，前 18% 周期内产生高频阻尼冲击)
+        val impactSpike = if (stepNormalized < 0.18) {
+            val tau = stepNormalized / 0.18
+            (5.5 * speedFactor * (1.0 - tau) * sin(tau * 3.0 * PI)).toFloat()
+        } else 0f
+
+        // b. Vertical oscillation bounce (身体重心升降谐波，频率为 2 * fStep)
+        val bounceVertical = (2.8 * speedFactor * sin(2.0 * phaseRad)).toFloat()
+
+        // c. Forward-backward push-off & swing (前后向摆动，基频 fStep)
+        val forwardAcc = (2.2 * speedFactor * sin(phaseRad + 0.5 * PI)).toFloat()
+
+        // d. Lateral leg alternation sway (左右脚交替侧向微晃，频率为 0.5 * fStep，即全步幅周期)
+        val lateralSway = (1.4 * speedFactor * sin(0.5 * phaseRad)).toFloat()
+
+        // e. Biological noise (微小肌肉与衣物晃动噪声)
+        val noiseX = (random.nextGaussian() * 0.12).toFloat()
+        val noiseY = (random.nextGaussian() * 0.12).toFloat()
+        val noiseZ = (random.nextGaussian() * 0.18).toFloat()
+
+        // Total raw accelerometer (with Earth's gravity 9.81 m/s^2 on Z-axis)
+        val ax = lateralSway + noiseX
+        val ay = forwardAcc + noiseY
+        val az = 9.81f + bounceVertical + impactSpike + noiseZ
+
+        // Pure linear acceleration (without gravity)
+        val linAx = lateralSway + noiseX
+        val linAy = forwardAcc + noiseY
+        val linAz = bounceVertical + impactSpike + noiseZ
 
         for (entry in activeListeners) {
             runCatching {
@@ -171,6 +219,16 @@ class AccelerometerCadenceHooks(
                             val event = createSensorEvent(entry.sensor, floatArrayOf(ax, ay, az), nowNanos)
                             if (event != null) entry.listener.onSensorChanged(event)
                         }
+                    }
+                    Sensor.TYPE_LINEAR_ACCELERATION -> {
+                        if (allowAccelerometer) {
+                            val event = createSensorEvent(entry.sensor, floatArrayOf(linAx, linAy, linAz), nowNanos)
+                            if (event != null) entry.listener.onSensorChanged(event)
+                        }
+                    }
+                    Sensor.TYPE_GRAVITY -> {
+                        val event = createSensorEvent(entry.sensor, floatArrayOf(0f, 0f, 9.81f), nowNanos)
+                        if (event != null) entry.listener.onSensorChanged(event)
                     }
                     Sensor.TYPE_STEP_COUNTER -> {
                         if (hasNewStep) {
@@ -189,9 +247,34 @@ class AccelerometerCadenceHooks(
         }
     }
 
+    private fun dispatchStationaryState(nowNanos: Long) {
+        val staticNoise = 0.03f
+        val ax = (random.nextGaussian() * staticNoise).toFloat()
+        val ay = (random.nextGaussian() * staticNoise).toFloat()
+        val az = 9.81f + (random.nextGaussian() * staticNoise).toFloat()
+
+        for (entry in activeListeners) {
+            runCatching {
+                when (entry.sensorType) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        val event = createSensorEvent(entry.sensor, floatArrayOf(ax, ay, az), nowNanos)
+                        if (event != null) entry.listener.onSensorChanged(event)
+                    }
+                    Sensor.TYPE_LINEAR_ACCELERATION -> {
+                        val event = createSensorEvent(entry.sensor, floatArrayOf(ax, ay, 0f), nowNanos)
+                        if (event != null) entry.listener.onSensorChanged(event)
+                    }
+                    Sensor.TYPE_GRAVITY -> {
+                        val event = createSensorEvent(entry.sensor, floatArrayOf(0f, 0f, 9.81f), nowNanos)
+                        if (event != null) entry.listener.onSensorChanged(event)
+                    }
+                }
+            }
+        }
+    }
+
     private fun createSensorEvent(sensor: Sensor, values: FloatArray, timestampNanos: Long): SensorEvent? {
         return runCatching {
-            // SensorEvent has package-private constructor: SensorEvent(int valueSize) or similar
             val constructor: Constructor<SensorEvent> = runCatching {
                 SensorEvent::class.java.getDeclaredConstructor(Integer.TYPE).apply { isAccessible = true }
             }.getOrElse {
@@ -204,13 +287,10 @@ class AccelerometerCadenceHooks(
                 constructor.newInstance(values.size)
             }
 
-            // Set sensor field
             findField(SensorEvent::class.java, "sensor")?.set(event, sensor)
-            // Set timestamp
             findField(SensorEvent::class.java, "timestamp")?.set(event, timestampNanos)
-            // Set accuracy
             findField(SensorEvent::class.java, "accuracy")?.set(event, SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
-            // Copy values
+
             val valuesField = findField(SensorEvent::class.java, "values")
             val targetValues = valuesField?.get(event) as? FloatArray
             if (targetValues != null) {

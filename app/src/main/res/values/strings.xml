@@ -220,4 +220,12 @@
 
     <string name="setting_save_failed">Could not save setting. Please retry.</string>
     <string name="setting_save_requested">Save requested. Any failure will be shown here.</string>
+    <string name="settings_group_location">Location</string>
+    <string name="settings_group_motion">Motion</string>
+    <string name="settings_group_map">Maps</string>
+    <string name="settings_group_general">General</string>
+    <string name="settings_group_location_summary">Location modes and position parameters, grouped by purpose.</string>
+    <string name="settings_group_motion_summary">Route, environment and peripheral settings in one place.</string>
+    <string name="settings_group_map_summary">Choose a map engine and tile server; manage service credentials and cache.</string>
+    <string name="settings_group_general_summary">Manage language, notifications and external control.</string>
 </resources>

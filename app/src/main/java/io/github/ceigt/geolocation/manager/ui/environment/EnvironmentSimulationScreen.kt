@@ -7,6 +7,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +33,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val AccentGreen = Color(0xFF006C5F)
-private val SecondaryText = Color(0xFF55717C)
+private val SecondaryText = Color(0xFF526870)
+private val PageBackground = Color(0xFFF3F7F8)
+private val CardBorder = Color(0xFFDCE7E9)
 
 private fun collectionPermissions(): Array<String> = buildList {
     add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -102,9 +106,16 @@ fun EnvironmentSimulationScreen(navController: NavController) {
     }
 
     Scaffold(
+        containerColor = PageBackground,
         topBar = {
             TopAppBar(
-                title = { Text("环境全要素采集与模拟", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Column {
+                        Text("环境采集与模拟", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("现场数据 · 环境快照", style = MaterialTheme.typography.labelMedium, color = SecondaryText)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PageBackground),
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -118,73 +129,79 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Environment Profile Selection Bar
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEDF6F5))
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF164E48))
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "当前激活环境: ${currentProfile.name}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentGreen
-                        )
-                        val locStr = if (currentProfile.latitude != null && currentProfile.longitude != null) {
-                            "坐标: ${"%.4f".format(currentProfile.latitude)}, ${"%.4f".format(currentProfile.longitude)}"
-                        } else "坐标: 随地图单点"
-                        Text(
-                            text = "$locStr | 卫星: ${currentProfile.satellites.size}颗 | AP: ${currentProfile.wifiAps.size} | " +
-                                "BLE: ${currentProfile.bleBeacons.size} | 基站: ${currentProfile.cellTowers.size}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SecondaryText
-                        )
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("当前激活环境", style = MaterialTheme.typography.labelMedium, color = Color(0xFFB7DCD3))
+                            Text(currentProfile.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                            val locStr = if (currentProfile.latitude != null && currentProfile.longitude != null) {
+                                "坐标: ${"%.4f".format(currentProfile.latitude)}, ${"%.4f".format(currentProfile.longitude)}"
+                            } else "坐标: 随地图单点"
+                            Text(locStr, style = MaterialTheme.typography.bodySmall, color = Color(0xFFD2E8E2))
+                        }
+                        IconButton(onClick = {
+                            editNameText = currentProfile.name
+                            editingProfile = currentProfile
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "重命名", tint = Color.White)
+                        }
                     }
-                    IconButton(onClick = {
-                        editNameText = currentProfile.name
-                        editingProfile = currentProfile
-                    }) {
-                        Icon(Icons.Default.Edit, contentDescription = "重命名", tint = AccentGreen)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        EnvironmentMetric("Wi-Fi", currentProfile.wifiAps.size, Modifier.weight(1f))
+                        EnvironmentMetric("基站", currentProfile.cellTowers.size, Modifier.weight(1f))
+                        EnvironmentMetric("卫星", currentProfile.satellites.size, Modifier.weight(1f))
+                        EnvironmentMetric("蓝牙", currentProfile.bleBeacons.size, Modifier.weight(1f))
                     }
                 }
             }
 
-            PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+            PrimaryTabRow(
+                selectedTabIndex = selectedTab.ordinal,
+                modifier = Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(18.dp)),
+                containerColor = Color.White,
+                contentColor = AccentGreen,
+                divider = {}
+            ) {
                 Tab(
+                    selectedContentColor = AccentGreen,
+                    unselectedContentColor = SecondaryText,
                     selected = selectedTab == EnvironmentSimulationTab.WIFI,
                     onClick = { selectedTab = EnvironmentSimulationTab.WIFI },
                     text = { Text("Wi-Fi") },
                     icon = { Icon(Icons.Default.Wifi, contentDescription = null) }
                 )
                 Tab(
+                    selectedContentColor = AccentGreen,
+                    unselectedContentColor = SecondaryText,
                     selected = selectedTab == EnvironmentSimulationTab.CELLULAR,
                     onClick = { selectedTab = EnvironmentSimulationTab.CELLULAR },
                     text = { Text("基站") },
                     icon = { Icon(Icons.Default.CellTower, contentDescription = null) }
                 )
                 Tab(
+                    selectedContentColor = AccentGreen,
+                    unselectedContentColor = SecondaryText,
                     selected = selectedTab == EnvironmentSimulationTab.SATELLITES,
                     onClick = { selectedTab = EnvironmentSimulationTab.SATELLITES },
                     text = { Text("卫星") },
                     icon = { Icon(Icons.Default.Satellite, contentDescription = null) }
                 )
                 Tab(
+                    selectedContentColor = AccentGreen,
+                    unselectedContentColor = SecondaryText,
                     selected = selectedTab == EnvironmentSimulationTab.BLE,
                     onClick = { selectedTab = EnvironmentSimulationTab.BLE },
                     text = { Text("蓝牙") },
                     icon = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
                 )
                 Tab(
+                    selectedContentColor = AccentGreen,
+                    unselectedContentColor = SecondaryText,
                     selected = selectedTab == EnvironmentSimulationTab.COLLECTION,
                     onClick = { selectedTab = EnvironmentSimulationTab.COLLECTION },
                     text = { Text("采集") },
@@ -201,9 +218,11 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                             items(currentProfile.wifiAps) { ap ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    border = BorderStroke(1.dp, CardBorder)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(ap.ssid, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                         Text(
                                             "BSSID: ${ap.bssid}  |  信号: ${ap.levelDbm} dBm  |  频段: ${ap.frequencyMhz} MHz",
@@ -224,9 +243,11 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                             items(currentProfile.cellTowers) { tower ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    border = BorderStroke(1.dp, CardBorder)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
                                             "${tower.radioType} 基站 (MCC:${tower.mcc} MNC:${tower.mnc})",
                                             style = MaterialTheme.typography.titleMedium,
@@ -256,9 +277,11 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                             items(currentProfile.satellites) { satellite ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    border = BorderStroke(1.dp, CardBorder)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
                                             "${constellationLabel(satellite.constellationType)} · SV ${satellite.svid}",
                                             style = MaterialTheme.typography.titleMedium,
@@ -299,9 +322,11 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                 items(currentProfile.bleBeacons, key = { it.id }) { beacon ->
                                     Card(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        border = BorderStroke(1.dp, CardBorder)
                                     ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
+                                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Text(
                                                 beacon.displayName,
                                                 style = MaterialTheme.typography.titleMedium,
@@ -334,24 +359,17 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F6F5))
+                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(1.dp, CardBorder),
+                                colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        "一键全要素同步现场采样",
+                                        "现场环境采集",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        "同时采集真实经纬度、周边 Wi-Fi 热点、GSM/WCDMA/CDMA/LTE/5G 基站、" +
-                                            "BLE 信标以及 GNSS 卫星状态，生成可复查的环境快照。缺少权限、无线关闭或无信号时，" +
-                                            "对应项目会留空并给出提示，不会填充伪造样本。",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = SecondaryText
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
                                     val missingPermissions = collectionPermissions().filter {
                                         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
                                     }
@@ -388,6 +406,8 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                             }
                                         },
                                         enabled = !isCollecting,
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                        shape = RoundedCornerShape(14.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
                                     ) {
                                         Icon(Icons.Default.Download, contentDescription = null)
@@ -398,6 +418,15 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                         Spacer(modifier = Modifier.height(12.dp))
                                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                                     }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        "同时采集真实经纬度、周边 Wi-Fi 热点、GSM/WCDMA/CDMA/LTE/5G 基站、" +
+                                            "BLE 信标以及 GNSS 卫星状态，生成可复查的环境快照。缺少权限、无线关闭或无信号时，" +
+                                            "对应项目会留空并给出提示，不会填充伪造样本。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = SecondaryText
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     if (lastWarnings.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text(
@@ -442,9 +471,10 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp),
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(18.dp),
+                                    border = BorderStroke(1.dp, CardBorder),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isAct) Color(0xFFE0F2F1) else Color.White
+                                        containerColor = if (isAct) Color(0xFFE4F3ED) else Color.White
                                     )
                                 ) {
                                     Row(
@@ -551,13 +581,28 @@ fun EnvironmentSimulationScreen(navController: NavController) {
 }
 
 @Composable
+private fun EnvironmentMetric(label: String, count: Int, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), color = Color(0xFF2A5F59)) {
+        Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFFD2E8E2))
+        }
+    }
+}
+
+@Composable
 private fun EmptyEnvironmentHint(text: String) {
     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = SecondaryText
-        )
+        Surface(shape = RoundedCornerShape(24.dp), color = Color.White, border = BorderStroke(1.dp, CardBorder)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.Sensors, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(32.dp))
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = SecondaryText)
+            }
+        }
     }
 }
 

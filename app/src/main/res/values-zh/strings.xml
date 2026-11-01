@@ -218,4 +218,12 @@
 
     <string name="setting_save_failed">设置保存失败，请重试。</string>
     <string name="setting_save_requested">已提交保存请求，失败时会在此提示。</string>
+    <string name="settings_group_location">定位</string>
+    <string name="settings_group_motion">运动</string>
+    <string name="settings_group_map">地图</string>
+    <string name="settings_group_general">通用</string>
+    <string name="settings_group_location_summary">定位模式与位置参数，按用途分组显示。</string>
+    <string name="settings_group_motion_summary">路线、环境与外设相关设置集中在这里。</string>
+    <string name="settings_group_map_summary">选择地图引擎和瓦片服务器，管理服务密钥与缓存。</string>
+    <string name="settings_group_general_summary">管理界面语言、提示与外部控制。</string>
 </resources>

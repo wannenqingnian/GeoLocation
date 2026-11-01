@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.github.ceigt.geolocation.R
+import io.github.ceigt.geolocation.data.model.route.RouteStepResult
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
 import io.github.ceigt.geolocation.manager.MainActivity
 import io.github.ceigt.geolocation.manager.mock.MockLocationService
@@ -66,7 +67,7 @@ class RouteSimulationService : Service() {
                     }
                 }
                 val notification = buildNotification(
-                    "路线当前位点: ${"%.5f".format(result.latitude)}, ${"%.5f".format(result.longitude)} | ${"%.1f".format(result.speedMps)} m/s"
+                    "位点: ${"%.5f".format(result.latitude)}, ${"%.5f".format(result.longitude)} | ${"%.1f".format(result.speedMps)} m/s | 步频: ${result.currentSpm} SPM | 步数: ${result.stepCount}"
                 )
                 val manager = getSystemService(NotificationManager::class.java)
                 manager?.notify(NOTIFICATION_ID, notification)

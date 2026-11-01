@@ -67,7 +67,12 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(point: OsmPoint): Boolean {
                     interaction()
-                    if (!playing) model.updateClickedLocation(tileServer.toWgs84(GeoPoint(point.latitude, point.longitude)))
+                    val wgs = tileServer.toWgs84(GeoPoint(point.latitude, point.longitude))
+                    if (model.uiState.value.isRoutePlanningMode) {
+                        model.addRouteWaypoint(wgs)
+                    } else if (!playing) {
+                        model.updateClickedLocation(wgs)
+                    }
                     return true
                 }
 
@@ -93,6 +98,14 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             icon = context.getDrawable(android.R.drawable.ic_menu_mylocation)
             setOnMarkerClickListener { _, _ -> true }
+        }
+    }
+    val routePolyline = remember(map) {
+        org.osmdroid.views.overlay.Polyline(map).apply {
+            outlinePaint.color = android.graphics.Color.parseColor("#006C5F")
+            outlinePaint.strokeWidth = 10f
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
         }
     }
     val unavailable = stringResource(R.string.toast_user_location_not_available)
@@ -147,6 +160,25 @@ internal fun OsmMapContainer(model: MapViewModel, tileServer: OsmTileServer, onM
             if (!map.overlays.contains(selectedMarker)) map.overlays.add(selectedMarker)
             map.controller.setZoom(state.mapZoom ?: DEFAULT_MAP_ZOOM)
             map.controller.setCenter(selectedMarker.position)
+        }
+        map.invalidate()
+    }
+    LaunchedEffect(map, state.plannedWaypoints, state.routeLoopMode) {
+        val wps = state.plannedWaypoints
+        if (wps.size < 2) {
+            map.overlays.remove(routePolyline)
+        } else {
+            val osmPoints = wps.map {
+                val disp = tileServer.fromWgs84(GeoPoint(it.latitude, it.longitude))
+                OsmPoint(disp.latitude, disp.longitude)
+            }.toMutableList()
+            if (state.routeLoopMode == io.github.ceigt.geolocation.data.model.route.RouteLoopMode.CYCLE && osmPoints.size > 2) {
+                osmPoints.add(osmPoints.first())
+            }
+            routePolyline.setPoints(osmPoints)
+            if (!map.overlays.contains(routePolyline)) {
+                map.overlays.add(routePolyline)
+            }
         }
         map.invalidate()
     }

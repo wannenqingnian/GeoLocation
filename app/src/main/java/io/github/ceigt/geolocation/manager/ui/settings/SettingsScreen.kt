@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,6 +73,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -104,8 +110,10 @@ private object Dimensions {
     val CARD_ELEVATION = 0.dp
 }
 
-private val MiuixPageBackground = Color(0xFFF3F6F5)
+private val MiuixPageBackground = Color(0xFFF3F7F8)
 private val MiuixCardSurface = Color(0xFFFFFFFF)
+private val SettingsAccent = Color(0xFF006C5F)
+private val SettingsOutline = Color(0xFFDCE7E9)
 private const val BAIDU_AK_CONSOLE_URL = "https://lbsyun.baidu.com/apiconsole/key#/home"
 private const val BAIDU_MAP_REFERER_HOST = "appassets.androidplatform.net"
 private const val AMAP_CONSOLE_URL = "https://console.amap.com/dev/key/app"
@@ -270,6 +278,8 @@ fun SettingsScreen(
     var targetAppScopeRequired by remember { mutableStateOf(false) }
     var settingsTab by remember { mutableStateOf(0) }
 
+    LaunchedEffect(settingsTab) { scrollState.scrollTo(0) }
+
     LaunchedEffect(Unit) {
         settingsViewModel.saveError.collect { failed ->
             if (failed) {
@@ -330,23 +340,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                PrimaryTabRow(selectedTabIndex = settingsTab) {
-                    Tab(
-                        selected = settingsTab == 0,
-                        onClick = { settingsTab = 0 },
-                        text = { Text("定位与高阶") }
-                    )
-                    Tab(
-                        selected = settingsTab == 1,
-                        onClick = { settingsTab = 1 },
-                        text = { Text("外设与子系统") }
-                    )
-                    Tab(
-                        selected = settingsTab == 2,
-                        onClick = { settingsTab = 2 },
-                        text = { Text("地图与通用") }
-                    )
-                }
+                SettingsCategoryTabs(selectedIndex = settingsTab, onSelected = { settingsTab = it })
 
                 Column(
                     modifier = Modifier
@@ -356,6 +350,8 @@ fun SettingsScreen(
                 ) {
                     Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
 
+                    SettingsCategorySummary(selectedIndex = settingsTab)
+
                     when (settingsTab) {
                         0 -> {
                             CategoryHeader(stringResource(R.string.category_location_mode))
@@ -364,6 +360,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -380,6 +377,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -444,6 +442,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -533,6 +532,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -598,6 +598,7 @@ fun SettingsScreen(
                                         .fillMaxWidth()
                                         .padding(vertical = Dimensions.SPACING_SMALL),
                                     shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                     colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                     elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                                 ) {
@@ -629,6 +630,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -663,6 +665,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -753,6 +756,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -789,12 +793,15 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
 
+                        }
+                        3 -> {
                             CategoryHeader(stringResource(R.string.category_language))
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -815,6 +822,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -835,6 +843,7 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = Dimensions.SPACING_SMALL),
                                 shape = RoundedCornerShape(Dimensions.CARD_CORNER_RADIUS),
+                                border = BorderStroke(1.dp, SettingsOutline),
                                 colors = CardDefaults.cardColors(containerColor = MiuixCardSurface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.CARD_ELEVATION)
                             ) {
@@ -920,6 +929,9 @@ fun SettingsBottomSheet(
     val cacheScope = rememberCoroutineScope()
     var missingSystemScopePackages by remember { mutableStateOf<List<String>?>(null) }
     var targetAppScopeRequired by remember { mutableStateOf(false) }
+    var settingsTab by remember { mutableStateOf(0) }
+
+    LaunchedEffect(settingsTab) { scrollState.scrollTo(0) }
 
     LaunchedEffect(Unit) {
         settingsViewModel.saveError.collect { failed ->
@@ -952,7 +964,7 @@ fun SettingsBottomSheet(
         modifier = Modifier,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Color(0xFFF5FBFC),
+        containerColor = MiuixPageBackground,
         scrimColor = Color.Transparent,
         dragHandle = null
     ) {
@@ -965,7 +977,6 @@ fun SettingsBottomSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState)
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -995,123 +1006,143 @@ fun SettingsBottomSheet(
                     }
                 }
 
-                SettingsSheetSection(stringResource(R.string.category_language)) {
-                    LanguageSettingItem(
-                        selectedLanguage = selectedLanguage,
-                        onLanguageSelected = { option ->
-                            settingsViewModel.setLanguageTag(option.tag)
-                            LocaleController.persistLanguageTag(context, option.tag)
-                            (context as? Activity)?.recreate()
-                        }
-                    )
-                }
-                SettingsSheetSection(stringResource(R.string.category_notifications)) {
-                    BooleanSettingItem(
-                        title = stringResource(R.string.setting_hide_toast_title),
-                        description = stringResource(R.string.setting_hide_toast_description),
-                        checked = settingsViewModel.hideFakeLocationToast.collectAsState().value,
-                        onCheckedChange = settingsViewModel::setHideFakeLocationToast
-                    )
-                }
-                SettingsSheetSection(stringResource(R.string.category_external_control)) {
-                    BooleanSettingItem(
-                        title = stringResource(R.string.setting_external_broadcast_title),
-                        description = stringResource(R.string.setting_external_broadcast_description),
-                        checked = settingsViewModel.enableBroadcastControl.collectAsState().value,
-                        onCheckedChange = { enabled ->
-                            settingsViewModel.setEnableBroadcastControl(enabled)
-                            setControlReceiverEnabled(context, enabled)
-                        }
-                    )
-                }
-                SettingsSheetSection(stringResource(R.string.category_location_mode)) {
-                    LocationModeSelector(
-                        selectedMode = settingsViewModel.locationMode.collectAsState().value,
-                        onModeSelected = settingsViewModel::selectLocationMode
-                    )
-                }
+                SettingsCategoryTabs(selectedIndex = settingsTab, onSelected = { settingsTab = it })
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(scrollState)
+                ) {
+                    SettingsCategorySummary(selectedIndex = settingsTab)
+                    when (settingsTab) {
+                        0 -> {
+                            SettingsSheetSection(stringResource(R.string.category_location_mode)) {
+                                LocationModeSelector(
+                                    selectedMode = settingsViewModel.locationMode.collectAsState().value,
+                                    onModeSelected = settingsViewModel::selectLocationMode
+                                )
+                            }
 
-                SettingsSheetSection("高级模拟子系统") {
-                    Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
-                        LocationModeOption(
-                            title = "路线规划与跑道巡航 (Route Simulation)",
-                            description = "管理已收藏的巡航路线、一键生成标准 400 米环形跑道并启动模拟",
-                            selected = false,
-                            onClick = {
-                                onDismissRequest()
-                                navController?.navigate(Screen.Route.route)
-                            }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        LocationModeOption(
-                            title = "环境全要素采集与模拟 (Virtual Environment)",
-                            description = "配置虚拟 AP 热点、4G/5G 蜂窝基站与蓝牙信标，支持现场一键真实无线电全要素采样",
-                            selected = false,
-                            onClick = {
-                                onDismissRequest()
-                                navController?.navigate(Screen.Environment.route)
-                            }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                        LocationModeOption(
-                            title = "NFC 标签读写与虚拟派发 (NFC Simulation)",
-                            description = "读取实体 NFC 卡片 NDEF 记录，支持免贴卡向目标应用直接派发虚拟标签",
-                            selected = false,
-                            onClick = {
-                                onDismissRequest()
-                                navController?.navigate(Screen.Nfc.route)
-                            }
-                        )
-                    }
-                }
-
-                SettingsSheetSection(stringResource(R.string.category_map_service)) {
-                    MapServiceSettings(
-                        provider = settingsViewModel.mapProvider.collectAsState().value,
-                        onProviderSelected = settingsViewModel::setMapProvider,
-                        osmTileServer = settingsViewModel.osmTileServer.collectAsState().value,
-                        onOsmTileServerSelected = settingsViewModel::setOsmTileServer,
-                        baiduMapAk = settingsViewModel.baiduMapAk.collectAsState().value,
-                        amapWebKey = settingsViewModel.amapWebKey.collectAsState().value,
-                        amapSecurityCode = settingsViewModel.amapSecurityCode.collectAsState().value,
-                        googleMapsApiKey = settingsViewModel.googleMapsApiKey.collectAsState().value,
-                        onSaveBaidu = settingsViewModel::setBaiduMapAk,
-                        onSaveAmap = { key, code ->
-                            settingsViewModel.setAmapWebKey(key)
-                            settingsViewModel.setAmapSecurityCode(code)
-                        },
-                        onSaveGoogle = settingsViewModel::setGoogleMapsApiKey,
-                        onSaved = {
-                            cacheScope.launch {
-                                snackbarHostState.showSnackbar(context.getString(R.string.setting_save_requested))
-                            }
-                        },
-                        onClearMapCache = {
-                            cacheScope.launch {
-                                val cleared = WebMapCache.clear(context)
-                                snackbarHostState.showSnackbar(context.getString(
-                                    if (cleared) R.string.setting_map_cache_cleared
-                                    else R.string.setting_map_cache_failed))
+                            categories.forEach { (category, settingsInCategory) ->
+                                SettingsSheetSection(category) {
+                                    settingsInCategory.forEachIndexed { index, settingTitle ->
+                                        when (val setting = allSettings.find { it.title == settingTitle }) {
+                                            is DoubleSettingData -> DoubleSettingComposable(setting, failedSaveRevision)
+                                            is FloatSettingData -> FloatSettingComposable(setting, failedSaveRevision)
+                                            null -> Unit
+                                        }
+                                        if (index != settingsInCategory.lastIndex) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
-                    )
-                }
-                categories.forEach { (category, settingsInCategory) ->
-                    SettingsSheetSection(category) {
-                        settingsInCategory.forEachIndexed { index, settingTitle ->
-                            when (val setting = allSettings.find { it.title == settingTitle }) {
-                                is DoubleSettingData -> DoubleSettingComposable(setting, failedSaveRevision)
-                                is FloatSettingData -> FloatSettingComposable(setting, failedSaveRevision)
-                                null -> Unit
+                        1 -> {
+                            SettingsSheetSection("高级模拟子系统") {
+                                Column(modifier = Modifier.padding(Dimensions.SPACING_SMALL)) {
+                                    LocationModeOption(
+                                        title = "路线规划与跑道巡航 (Route Simulation)",
+                                        description = "管理已收藏的巡航路线、一键生成标准 400 米环形跑道并启动模拟",
+                                        selected = false,
+                                        onClick = {
+                                            onDismissRequest()
+                                            navController?.navigate(Screen.Route.route)
+                                        }
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    LocationModeOption(
+                                        title = "环境全要素采集与模拟 (Virtual Environment)",
+                                        description = "配置虚拟 AP 热点、4G/5G 蜂窝基站与蓝牙信标，支持现场一键真实无线电全要素采样",
+                                        selected = false,
+                                        onClick = {
+                                            onDismissRequest()
+                                            navController?.navigate(Screen.Environment.route)
+                                        }
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    LocationModeOption(
+                                        title = "NFC 标签读写与虚拟派发 (NFC Simulation)",
+                                        description = "读取实体 NFC 卡片 NDEF 记录，支持免贴卡向目标应用直接派发虚拟标签",
+                                        selected = false,
+                                        onClick = {
+                                            onDismissRequest()
+                                            navController?.navigate(Screen.Nfc.route)
+                                        }
+                                    )
+                                }
                             }
-                            if (index != settingsInCategory.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = Dimensions.SPACING_SMALL),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+
+                        }
+                        2 -> {
+                            SettingsSheetSection(stringResource(R.string.category_map_service)) {
+                                MapServiceSettings(
+                                    provider = settingsViewModel.mapProvider.collectAsState().value,
+                                    onProviderSelected = settingsViewModel::setMapProvider,
+                                    osmTileServer = settingsViewModel.osmTileServer.collectAsState().value,
+                                    onOsmTileServerSelected = settingsViewModel::setOsmTileServer,
+                                    baiduMapAk = settingsViewModel.baiduMapAk.collectAsState().value,
+                                    amapWebKey = settingsViewModel.amapWebKey.collectAsState().value,
+                                    amapSecurityCode = settingsViewModel.amapSecurityCode.collectAsState().value,
+                                    googleMapsApiKey = settingsViewModel.googleMapsApiKey.collectAsState().value,
+                                    onSaveBaidu = settingsViewModel::setBaiduMapAk,
+                                    onSaveAmap = { key, code ->
+                                        settingsViewModel.setAmapWebKey(key)
+                                        settingsViewModel.setAmapSecurityCode(code)
+                                    },
+                                    onSaveGoogle = settingsViewModel::setGoogleMapsApiKey,
+                                    onSaved = {
+                                        cacheScope.launch {
+                                            snackbarHostState.showSnackbar(context.getString(R.string.setting_save_requested))
+                                        }
+                                    },
+                                    onClearMapCache = {
+                                        cacheScope.launch {
+                                            val cleared = WebMapCache.clear(context)
+                                            snackbarHostState.showSnackbar(context.getString(
+                                                if (cleared) R.string.setting_map_cache_cleared
+                                                else R.string.setting_map_cache_failed))
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        3 -> {
+                            SettingsSheetSection(stringResource(R.string.category_language)) {
+                                LanguageSettingItem(
+                                    selectedLanguage = selectedLanguage,
+                                    onLanguageSelected = { option ->
+                                        settingsViewModel.setLanguageTag(option.tag)
+                                        LocaleController.persistLanguageTag(context, option.tag)
+                                        (context as? Activity)?.recreate()
+                                    }
+                                )
+                            }
+                            SettingsSheetSection(stringResource(R.string.category_notifications)) {
+                                BooleanSettingItem(
+                                    title = stringResource(R.string.setting_hide_toast_title),
+                                    description = stringResource(R.string.setting_hide_toast_description),
+                                    checked = settingsViewModel.hideFakeLocationToast.collectAsState().value,
+                                    onCheckedChange = settingsViewModel::setHideFakeLocationToast
+                                )
+                            }
+                            SettingsSheetSection(stringResource(R.string.category_external_control)) {
+                                BooleanSettingItem(
+                                    title = stringResource(R.string.setting_external_broadcast_title),
+                                    description = stringResource(R.string.setting_external_broadcast_description),
+                                    checked = settingsViewModel.enableBroadcastControl.collectAsState().value,
+                                    onCheckedChange = { enabled ->
+                                        settingsViewModel.setEnableBroadcastControl(enabled)
+                                        setControlReceiverEnabled(context, enabled)
+                                    }
                                 )
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(Dimensions.SPACING_MEDIUM))
                 }
             }
             SnackbarHost(
@@ -1146,6 +1177,58 @@ fun SettingsBottomSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsCategoryTabs(selectedIndex: Int, onSelected: (Int) -> Unit) {
+    val labels = listOf(
+        R.string.settings_group_location,
+        R.string.settings_group_motion,
+        R.string.settings_group_map,
+        R.string.settings_group_general
+    )
+    val icons = listOf(Icons.Default.MyLocation, Icons.Default.DirectionsWalk, Icons.Default.Map, Icons.Default.Settings)
+    PrimaryTabRow(
+        selectedTabIndex = selectedIndex,
+        modifier = Modifier.padding(bottom = 12.dp).clip(RoundedCornerShape(18.dp)),
+        containerColor = MiuixCardSurface,
+        contentColor = SettingsAccent,
+        divider = {}
+    ) {
+        labels.forEachIndexed { index, label ->
+            Tab(
+                selected = selectedIndex == index,
+                onClick = { onSelected(index) },
+                selectedContentColor = SettingsAccent,
+                unselectedContentColor = Color(0xFF526870),
+                text = { Text(stringResource(label), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold) },
+                icon = { Icon(icons[index], contentDescription = null) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategorySummary(selectedIndex: Int) {
+    val summaries = listOf(
+        R.string.settings_group_location_summary,
+        R.string.settings_group_motion_summary,
+        R.string.settings_group_map_summary,
+        R.string.settings_group_general_summary
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFE4F3ED)
+    ) {
+        Text(
+            text = stringResource(summaries[selectedIndex]),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF24554C),
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
 @Composable
 private fun SettingsSheetSection(
     title: String,
@@ -1157,6 +1240,7 @@ private fun SettingsSheetSection(
             .fillMaxWidth()
             .padding(bottom = Dimensions.SPACING_MEDIUM),
         shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, SettingsOutline),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) { content() }

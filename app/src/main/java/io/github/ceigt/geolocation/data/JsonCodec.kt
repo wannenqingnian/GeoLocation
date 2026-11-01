@@ -478,6 +478,9 @@ object JsonCodec {
                 .put("name", rf.name)
                 .put("loopMode", rf.loopMode.name)
                 .put("travelMode", rf.travelMode.name)
+                .put("speedMps", rf.speedMps)
+                .put("cadenceMode", rf.cadenceMode.storedValue)
+                .put("customSpm", rf.customSpm)
                 .put("createdAt", rf.createdAtEpochMillis)
 
             val wpArr = JSONArray()
@@ -507,6 +510,9 @@ object JsonCodec {
                 val name = obj.getString("name")
                 val loopMode = io.github.ceigt.geolocation.data.model.route.RouteLoopMode.fromName(obj.optString("loopMode"))
                 val travelMode = io.github.ceigt.geolocation.data.model.route.RouteTravelMode.fromName(obj.optString("travelMode"))
+                val speedMps = obj.optDouble("speedMps", travelMode.defaultSpeedMps)
+                val cadenceMode = io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.fromStored(obj.optString("cadenceMode", "auto"))
+                val customSpm = obj.optInt("customSpm", 165)
                 val createdAt = obj.optLong("createdAt", System.currentTimeMillis())
 
                 val waypoints = mutableListOf<io.github.ceigt.geolocation.data.model.route.RouteWaypoint>()
@@ -524,7 +530,19 @@ object JsonCodec {
                         )
                     }
                 }
-                list.add(io.github.ceigt.geolocation.data.model.route.RouteFavorite(id, name, waypoints, loopMode, travelMode, createdAt))
+                list.add(
+                    io.github.ceigt.geolocation.data.model.route.RouteFavorite(
+                        id = id,
+                        name = name,
+                        waypoints = waypoints,
+                        loopMode = loopMode,
+                        travelMode = travelMode,
+                        speedMps = speedMps,
+                        cadenceMode = cadenceMode,
+                        customSpm = customSpm,
+                        createdAtEpochMillis = createdAt
+                    )
+                )
             }
             list
         }.getOrDefault(emptyList())
