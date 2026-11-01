@@ -303,7 +303,13 @@ fun RouteSimulationScreen(navController: NavController) {
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("步频模拟模式", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text("路线专属步频模式", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "💡 说明：此处步频仅在当前路线巡航时生效；如需全局拦截，可在「设置-步频与传感器」统一配置。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF55717C),
+                        modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                    )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = editCadenceMode == TargetCadenceMode.AUTO,
@@ -324,12 +330,35 @@ fun RouteSimulationScreen(navController: NavController) {
 
                     if (editCadenceMode == TargetCadenceMode.CUSTOM) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text("自定义步频: $editCustomSpm 步/分钟", style = MaterialTheme.typography.labelSmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = { editCustomSpm = (editCustomSpm - 5).coerceIn(40, 240) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Remove, contentDescription = "-5")
+                            }
+                            Text(
+                                text = "目标步频: $editCustomSpm SPM",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilledTonalIconButton(
+                                onClick = { editCustomSpm = (editCustomSpm + 5).coerceIn(40, 240) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "+5")
+                            }
+                        }
                         Slider(
                             value = editCustomSpm.toFloat(),
                             onValueChange = { editCustomSpm = it.toInt() },
-                            valueRange = 60f..220f,
-                            steps = 160
+                            valueRange = 40f..240f,
+                            steps = 200
                         )
                     }
                 }

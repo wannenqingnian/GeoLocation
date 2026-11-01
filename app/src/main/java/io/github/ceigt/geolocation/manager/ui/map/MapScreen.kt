@@ -62,6 +62,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.AutoMode
@@ -1986,18 +1988,43 @@ private fun RoutePlanningPanel(
                 )
             }
 
+            Text(
+                "💡 路线专属步频仅在巡航时生效；全局/分应用接管可在「设置-步频与传感器」统一配置。",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF55717C),
+                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+            )
+
             if (uiState.routeCadenceMode == io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("目标步频: ${uiState.routeCustomSpm} SPM", style = MaterialTheme.typography.labelSmall)
+                    androidx.compose.material3.FilledTonalIconButton(
+                        onClick = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM, (uiState.routeCustomSpm - 5).coerceIn(40, 240)) },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.Remove, contentDescription = "-5")
+                    }
+                    Text(
+                        text = "目标步频: ${uiState.routeCustomSpm} SPM",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    androidx.compose.material3.FilledTonalIconButton(
+                        onClick = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM, (uiState.routeCustomSpm + 5).coerceIn(40, 240)) },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "+5")
+                    }
                 }
                 Slider(
                     value = uiState.routeCustomSpm.toFloat(),
                     onValueChange = { mapViewModel.setRouteCadence(io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM, it.toInt()) },
-                    valueRange = 60f..220f,
-                    steps = 160
+                    valueRange = 40f..240f,
+                    steps = 200
                 )
             }
 

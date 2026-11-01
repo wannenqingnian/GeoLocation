@@ -408,17 +408,20 @@ object LocationUtil {
     private const val FALLBACK_ACCURACY_METERS = 5F
 
     /**
-     * Compute step cadence SPM (steps per minute) strictly based on movement speed
+     * Compute step cadence SPM (steps per minute) strictly based on movement speed.
+     * Delegates to authoritative [io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator].
      */
     fun computeCadenceStepsPerMinute(speedMetersPerSec: Float, enabled: Boolean, customSpm: Int?): Int {
-        if (!enabled || speedMetersPerSec < 0.2f) return 0
-        if (customSpm != null && customSpm > 0) return customSpm
-        return if (speedMetersPerSec < 2.2f) {
-            // Walking / slow walking
-            kotlin.math.round((speedMetersPerSec * 32.0f + 80.0f)).toInt().coerceIn(90, 150)
+        if (!enabled) return 0
+        val mode = if (customSpm != null && customSpm > 0) {
+            io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.CUSTOM
         } else {
-            // Running
-            kotlin.math.round((speedMetersPerSec * 8.0f + 150.0f)).toInt().coerceIn(150, 200)
+            io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode.AUTO
         }
+        return io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator.computeSpm(
+            speedMps = speedMetersPerSec.toDouble(),
+            mode = mode,
+            customSpm = customSpm
+        )
     }
 }

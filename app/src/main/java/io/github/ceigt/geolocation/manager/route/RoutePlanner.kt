@@ -39,7 +39,8 @@ object RoutePlanner {
      * Estimate total steps based on distance and travel mode
      */
     fun estimateSteps(distanceMeters: Double, speedMps: Double): Long {
-        val strideLength = (0.7 + 0.15 * speedMps).coerceIn(0.55, 1.35)
+        val spm = io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator.computeSpm(speedMps)
+        val strideLength = io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator.computeStrideLengthMeters(speedMps, spm)
         return if (strideLength > 0.1) (distanceMeters / strideLength).toLong() else 0L
     }
 
