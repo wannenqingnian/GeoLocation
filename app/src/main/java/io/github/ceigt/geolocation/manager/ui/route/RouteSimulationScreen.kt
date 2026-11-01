@@ -114,6 +114,7 @@ fun RouteSimulationScreen(navController: NavController) {
                         onToggleSimulation = {
                             if (isRunning) {
                                 RouteSimulationService.stopService(context)
+                                scope.launch { repository.saveIsPlaying(false) }
                             } else {
                                 val curLoc = repository.getLastClickedLocation()
                                 if (curLoc != null) {
@@ -133,6 +134,7 @@ fun RouteSimulationScreen(navController: NavController) {
                                 cadenceMode = rf.cadenceMode,
                                 customSpm = rf.customSpm
                             )
+                            scope.launch { repository.saveIsPlaying(true) }
                             checkNotificationPermission()
                             RouteSimulationService.startService(context)
                             Toast.makeText(context, "已启动巡航: ${rf.name}", Toast.LENGTH_SHORT).show()
@@ -215,6 +217,7 @@ fun RouteSimulationScreen(navController: NavController) {
                                 waypoints = trackWps,
                                 runMode = RouteRunMode.AUTOMATIC
                             )
+                            scope.launch { repository.saveIsPlaying(true) }
                             checkNotificationPermission()
                             RouteSimulationService.startService(context)
                             Toast.makeText(context, "已启动 ${m.toInt()} 米跑道巡航 (自起跑点开始)", Toast.LENGTH_SHORT).show()

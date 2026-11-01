@@ -143,6 +143,34 @@ class PreferencesRepository(context: Context) {
         }
     }
 
+    /**
+     * Atomic, high-performance motion tick update for RouteSimulationService.
+     * Simultaneously updates coordinates, speed, and ensures isPlaying = true in a SINGLE transaction,
+     * while notifying MockLocationService and RootLocationService as needed.
+     */
+    suspend fun updateRouteSimulationMotion(
+        latitude: Double,
+        longitude: Double,
+        speedMps: Float
+    ) {
+        if (!latitude.isFinite() || !longitude.isFinite() || latitude !in -90.0..90.0 || longitude !in -180.0..180.0) return
+        val json = JsonCodec.encodeLocation(LastClickedLocation(latitude, longitude))
+        editHookSetting {
+            putString(KEY_LAST_CLICKED_LOCATION, json)
+            putBoolean(KEY_IS_PLAYING, true)
+            if (speedMps > 0f) {
+                putFloat(KEY_SPEED, speedMps)
+                putBoolean(KEY_USE_SPEED, true)
+            }
+        }
+        if (getEnableMockProvider()) {
+            MockLocationService.sync(appContext, true)
+        }
+        if (getEnableRootMode()) {
+            io.github.ceigt.geolocation.manager.root.RootLocationService.sync(appContext, true)
+        }
+    }
+
     fun getLastClickedLocation(): LastClickedLocation? =
         parseLastClickedLocation(
             sharedPrefs()?.getString(KEY_LAST_CLICKED_LOCATION, null)

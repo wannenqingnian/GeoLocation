@@ -523,13 +523,19 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             cadenceMode = state.routeCadenceMode,
             customSpm = state.routeCustomSpm
         )
+        writer.enqueue {
+            preferencesRepository.saveIsPlaying(true)
+        }
         io.github.ceigt.geolocation.manager.route.RouteSimulationService.startService(context)
-        _uiState.update { it.copy(isRouteSimulating = true) }
+        _uiState.update { it.copy(isRouteSimulating = true, isPlaying = true) }
     }
 
     fun stopSimulatingRoute(context: android.content.Context) {
         io.github.ceigt.geolocation.manager.route.RouteSimulationService.stopService(context)
-        _uiState.update { it.copy(isRouteSimulating = false) }
+        writer.enqueue {
+            preferencesRepository.saveIsPlaying(false)
+        }
+        _uiState.update { it.copy(isRouteSimulating = false, isPlaying = false) }
     }
     // endregion
 

@@ -18,6 +18,7 @@ import io.github.ceigt.geolocation.R
 import io.github.ceigt.geolocation.data.model.route.RouteStepResult
 import io.github.ceigt.geolocation.data.repository.PreferencesRepository
 import io.github.ceigt.geolocation.manager.MainActivity
+import io.github.ceigt.geolocation.manager.ui.map.GeoPoint
 import io.github.ceigt.geolocation.manager.mock.MockLocationService
 import io.github.ceigt.geolocation.manager.root.RootLocationService
 import kotlinx.coroutines.CoroutineScope
@@ -60,11 +61,11 @@ class RouteSimulationService : Service() {
             val result = engine.tick()
             if (result != null) {
                 scope.launch {
-                    repository.saveLastClickedLocation(result.latitude, result.longitude)
-                    if (result.speedMps > 0) {
-                        repository.saveSpeed(result.speedMps)
-                        repository.saveUseSpeed(true)
-                    }
+                    repository.updateRouteSimulationMotion(
+                        latitude = result.latitude,
+                        longitude = result.longitude,
+                        speedMps = result.speedMps
+                    )
                 }
                 val notification = buildNotification(
                     "位点: ${"%.5f".format(result.latitude)}, ${"%.5f".format(result.longitude)} | ${"%.1f".format(result.speedMps)} m/s | 步频: ${result.currentSpm} SPM | 步数: ${result.stepCount}"
@@ -87,6 +88,19 @@ class RouteSimulationService : Service() {
         thread = HandlerThread("RouteSimulationWorker").apply { start() }
         handler = Handler(thread.looper)
         isRunning = true
+
+        // Push initial point immediately so simulation is active at second 0
+        val initialPt = engine.state.plannedPath.firstOrNull() ?: engine.state.points.firstOrNull()?.let { GeoPoint(it.latitude, it.longitude) }
+        if (initialPt != null) {
+            scope.launch {
+                repository.updateRouteSimulationMotion(
+                    latitude = initialPt.latitude,
+                    longitude = initialPt.longitude,
+                    speedMps = engine.state.speedMetersPerSecond.toFloat()
+                )
+            }
+        }
+
         handler.post(ticker)
     }
 
@@ -96,6 +110,7 @@ class RouteSimulationService : Service() {
             ACTION_RESUME -> engine.resume()
             ACTION_STOP -> {
                 engine.stop()
+                scope.launch { repository.saveIsPlaying(false) }
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -108,6 +123,7 @@ class RouteSimulationService : Service() {
         engine.stop()
         handler.removeCallbacksAndMessages(null)
         thread.quitSafely()
+        scope.launch { repository.saveIsPlaying(false) }
         super.onDestroy()
     }
 

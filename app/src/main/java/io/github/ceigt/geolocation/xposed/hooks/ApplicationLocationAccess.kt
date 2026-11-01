@@ -49,12 +49,10 @@ internal object ApplicationLocationAccess {
         SyntheticLocationAccess.allowed(mode.takeUnless { it == AppOpsManager.MODE_DEFAULT }, null, AppOpsManager.MODE_ALLOWED, foreground)
     }.getOrDefault(false)
 
-    fun replace(original: Location, provider: String = original.provider.orEmpty()): Location? {
-        val app = context ?: return null
-        val fine = app.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = app.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!fine && !coarse) return null
+    fun replace(original: Location, provider: String = original.provider.orEmpty()): Location {
         val fake = LocationUtil.createFakeLocation(original, provider)
+        val app = context ?: return fake
+        val fine = app.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         return if (fine) fake else SystemLocationPrivacy.coarseFallback(fake, app.packageName)
     }
 }
