@@ -378,6 +378,6 @@ object PreferencesUtil {
         val appCoordinateSystems: Map<String, CoordinateSystem> = emptyMap()
     )
 
-    // Listener notifications are immediate; this is only a missed-notification safety net.
-    private const val REFRESH_INTERVAL_NANOS = 10_000_000_000L
+    // Fast refresh interval (300ms) to ensure instant hot-reload even if IPC broadcast notification is delayed.
+    private const val REFRESH_INTERVAL_NANOS = 300_000_000L
 }

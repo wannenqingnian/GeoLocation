@@ -29,7 +29,7 @@ import io.github.ceigt.geolocation.domain.motion.MotionReplayEngine
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MotionReplayTab(
     replayEngine: MotionReplayEngine = remember { MotionReplayEngine() }
@@ -189,10 +189,11 @@ fun MotionReplayTab(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Metrics Row
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                         Column {
                             Text("回放累计步数", style = MaterialTheme.typography.labelSmall, color = Color(0xFF55717C))
                             Text("${replayState.accumulatedSteps} 步", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF006C5F))

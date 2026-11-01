@@ -137,12 +137,41 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("当前激活环境", style = MaterialTheme.typography.labelMedium, color = Color(0xFFB7DCD3))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("当前环境快照", style = MaterialTheme.typography.labelMedium, color = Color(0xFFB7DCD3))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (activeId != null) Color(0xFF2E7D32) else Color(0xFF55717C).copy(alpha = 0.5f)
+                                ) {
+                                    Text(
+                                        text = if (activeId != null) "已生效中" else "未激活生效",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Text(currentProfile.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
                             val locStr = if (currentProfile.latitude != null && currentProfile.longitude != null) {
                                 "坐标: ${"%.4f".format(currentProfile.latitude)}, ${"%.4f".format(currentProfile.longitude)}"
                             } else "坐标: 随地图单点"
                             Text(locStr, style = MaterialTheme.typography.bodySmall, color = Color(0xFFD2E8E2))
+                        }
+                        if (activeId != null) {
+                            Button(
+                                onClick = {
+                                    scope.launch { repository.saveActiveEnvironmentProfileId(null) }
+                                    Toast.makeText(context, "已取消环境快照生效，恢复默认独立定位与环境", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(34.dp).padding(end = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("取消生效", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                         IconButton(onClick = {
                             editNameText = currentProfile.name
@@ -498,7 +527,16 @@ fun EnvironmentSimulationScreen(navController: NavController) {
                                             )
                                         }
                                         Row {
-                                            if (!isAct) {
+                                            if (isAct) {
+                                                TextButton(onClick = {
+                                                    scope.launch {
+                                                        repository.saveActiveEnvironmentProfileId(null)
+                                                    }
+                                                    Toast.makeText(context, "已取消生效: ${prof.name}", Toast.LENGTH_SHORT).show()
+                                                }) {
+                                                    Text("取消生效", color = Color(0xFFD32F2F))
+                                                }
+                                            } else {
                                                 TextButton(onClick = {
                                                     scope.launch {
                                                         repository.saveActiveEnvironmentProfileId(prof.id)

@@ -36,12 +36,20 @@ object RoutePlanner {
     }
 
     /**
-     * Estimate total steps based on distance and travel mode
+     * Estimate total steps based on distance and travel mode.
+     * Realistic human pedestrian stride:
+     * - Walking (<= 1.8 m/s): ~0.68m (~588 steps per 400m)
+     * - Jogging (1.8 ~ 3.5 m/s): ~0.82m (~488 steps per 400m)
+     * - Faster / general: ~0.75m (~533 steps per 400m)
      */
     fun estimateSteps(distanceMeters: Double, speedMps: Double): Long {
-        val spm = io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator.computeSpm(speedMps)
-        val strideLength = io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator.computeStrideLengthMeters(speedMps, spm)
-        return if (strideLength > 0.1) (distanceMeters / strideLength).toLong() else 0L
+        if (distanceMeters <= 0.0) return 0L
+        val realisticStride = when {
+            speedMps <= 1.8 -> 0.68
+            speedMps <= 3.5 -> 0.82
+            else -> 0.75
+        }
+        return (distanceMeters / realisticStride).toLong()
     }
 
     /**

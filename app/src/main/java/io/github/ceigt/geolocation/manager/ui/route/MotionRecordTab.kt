@@ -34,7 +34,7 @@ import io.github.ceigt.geolocation.domain.motion.MotionDataCollector
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MotionRecordTab(
     onSessionSaved: () -> Unit = {}
@@ -100,9 +100,10 @@ fun MotionRecordTab(
                     color = Color(0xFF1E3A37)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SensorStatusBadge("加速度计", availability.hasAccelerometer)
                     SensorStatusBadge("陀螺仪", availability.hasGyroscope)
@@ -142,7 +143,7 @@ fun MotionRecordTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
                                 .size(12.dp)
@@ -174,9 +175,10 @@ fun MotionRecordTab(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Column {
                         Text("样本总点数", style = MaterialTheme.typography.labelSmall, color = Color(0xFF55717C))
@@ -288,9 +290,10 @@ fun MotionRecordTab(
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("真实运动类型", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
                         MotionActivityType.SLOW_WALK,
@@ -304,9 +307,10 @@ fun MotionRecordTab(
                         )
                     }
                 }
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
                         MotionActivityType.RUNNING,
@@ -323,9 +327,10 @@ fun MotionRecordTab(
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("手机携带/摆放位置", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
                         PhoneCarryPosition.PANT_POCKET,
@@ -339,9 +344,10 @@ fun MotionRecordTab(
                         )
                     }
                 }
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
                         PhoneCarryPosition.JACKET_POCKET,

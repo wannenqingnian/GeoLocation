@@ -29,7 +29,7 @@ import io.github.ceigt.geolocation.domain.motion.MotionEvaluator
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MotionEvaluationTab() {
     val context = LocalContext.current
@@ -221,10 +221,10 @@ fun MotionEvaluationTab() {
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0)),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                         ) {
-                            Row(
+                            FlowRow(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
                                     "第 ${slice.sliceIndex} 片 (${slice.startSecond.toInt()}s - ${slice.endSecond.toInt()}s)",
@@ -267,7 +267,7 @@ private fun EvaluationMetricRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(end = 8.dp))
             Surface(
                 shape = RoundedCornerShape(6.dp),
                 color = if (pass) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)

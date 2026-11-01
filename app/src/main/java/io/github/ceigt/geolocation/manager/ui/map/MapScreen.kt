@@ -1915,12 +1915,17 @@ private fun RoutePlanningPanel(
                         val cur = uiState.lastClickedLocation ?: uiState.plannedWaypoints.firstOrNull()?.let { GeoPoint(it.latitude, it.longitude) }
                         if (cur != null) {
                             val wps = io.github.ceigt.geolocation.manager.route.TrackGenerator.generateStadiumTrack(
-                                io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(cur.latitude, cur.longitude)
+                                io.github.ceigt.geolocation.data.model.route.TrackEditorConfig(
+                                    centerLat = cur.latitude,
+                                    centerLon = cur.longitude,
+                                    circumferenceMeters = 400.0,
+                                    startAtSelectedPoint = true
+                                )
                             )
                             mapViewModel.clearRouteWaypoints()
                             wps.forEach { mapViewModel.addRouteWaypoint(GeoPoint(it.latitude, it.longitude)) }
                         } else {
-                            Toast.makeText(context, "请在地图上选定操场中心点", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "请在地图上选定起跑点", Toast.LENGTH_SHORT).show()
                         }
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),

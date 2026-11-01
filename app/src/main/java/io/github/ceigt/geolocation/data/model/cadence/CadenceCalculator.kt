@@ -38,7 +38,7 @@ object CadenceCalculator {
      */
     fun computeStrideLengthMeters(speedMps: Double, spm: Int): Double {
         if (spm <= 0 || speedMps < 0.1) return 0.0
-        return (speedMps / (spm.toDouble() / 60.0)).coerceIn(0.4, 1.8)
+        return (speedMps / (spm.toDouble() / 60.0)).coerceIn(0.45, 1.15)
     }
 
     /**

@@ -5,6 +5,9 @@ import io.github.ceigt.geolocation.data.model.cadence.CadenceCalculator
 import io.github.ceigt.geolocation.data.model.cadence.TargetCadenceMode
 import io.github.ceigt.geolocation.data.model.route.*
 import io.github.ceigt.geolocation.manager.ui.map.GeoPoint
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.*
 
 data class PathCorner(
@@ -25,9 +28,14 @@ data class RouteStopSchedule(
 
 class RouteSimulationEngine {
 
-    @Volatile
-    var state: RouteSimulationState = RouteSimulationState()
-        private set
+    private val _stateFlow = MutableStateFlow(RouteSimulationState())
+    val stateFlow: StateFlow<RouteSimulationState> = _stateFlow.asStateFlow()
+
+    var state: RouteSimulationState
+        get() = _stateFlow.value
+        private set(value) {
+            _stateFlow.value = value
+        }
 
     private var lastUpdateNanos: Long = 0L
     private var currentPhase: RouteMotionPhase = RouteMotionPhase.IDLE

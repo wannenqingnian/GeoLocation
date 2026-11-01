@@ -104,6 +104,8 @@ data class RouteFavorite(
 data class TrackEditorConfig(
     val centerLat: Double,
     val centerLon: Double,
+    val circumferenceMeters: Double = 400.0,
+    val startAtSelectedPoint: Boolean = true,
     val scale: Float = 1.0f,
     val rotationDegrees: Float = 0f,
     val laps: Int = 1,
